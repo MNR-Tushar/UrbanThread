@@ -4,8 +4,8 @@ from .views import *
 
 from rest_framework.routers import DefaultRouter
 router = DefaultRouter()
-
-app_name = "users"
+router.register(r'allusers', Userviewset, basename='user')
+app_name = "accounts"
 
 urlpatterns = [
     path("register/", UserRegisterationAPIView.as_view(), name="create-user"),
