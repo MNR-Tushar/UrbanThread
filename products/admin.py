@@ -7,6 +7,14 @@ class CategoryAdmin(admin.ModelAdmin):
     ordering = ('-created_at',)
     search_fields = ('name', 'description')
     list_filter = ('created_at',)
+    
+
+@admin.register(Brand)
+class BrandAdmin(admin.ModelAdmin):
+    list_display = ('name', 'created_at')
+    ordering = ('-created_at',)
+    search_fields = ('name', 'description')
+    list_filter = ('created_at',)
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):

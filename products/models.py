@@ -4,7 +4,7 @@ from django.utils.text import slugify
 class Category(models.Model):
     name=models.CharField(max_length=100)
     description=models.TextField(blank=True,null=True)
-    slug=models.SlugField(max_length=150)
+    slug=models.SlugField(max_length=150,blank=True,unique=True)
     created_at=models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -18,7 +18,7 @@ class Category(models.Model):
 class Brand(models.Model):
     name=models.CharField(max_length=100)
     description=models.TextField(blank=True,null=True)
-    slug=models.SlugField(max_length=150)
+    slug=models.SlugField(max_length=150,blank=True,unique=True)
     created_at=models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -35,7 +35,7 @@ class Product(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2)
     discount_price = models.DecimalField(max_digits=10, decimal_places=2)
     is_available = models.BooleanField(default=True)
-    slug=models.SlugField(max_length=150)
+    slug=models.SlugField(max_length=150,blank=True,unique=True)
     created_at=models.DateTimeField(auto_now_add=True)
     category=models.ForeignKey(Category, on_delete=models.CASCADE)
     brand=models.ForeignKey(Brand, on_delete=models.CASCADE)
