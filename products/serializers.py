@@ -30,10 +30,23 @@ class ColorSerializer(serializers.ModelSerializer):
         model = Color
         fields = '__all__'
         read_only_fields = ('created_at',)
+        
+class CategoryMiniSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = ["id", "category_name"]
+
+
+class BrandMiniSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Brand
+        fields = ["id", "band_name"]
 
 class ProductListSerializer(serializers.ModelSerializer):
-    category=CategorySerializer(read_only=True)
-    brand=BrandSerializer(read_only=True)
+    category = CategoryMiniSerializer(read_only=True)
+    brand = BrandMiniSerializer(read_only=True)
+
+    
     images=ProductImageSerializer(many=True, read_only=True)
     class Meta:
         model = Product
@@ -49,7 +62,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Product
-        fields = ['id', 'name', 'description', 'price', 'discount_price', 
+        fields = ['id', 'product_name', 'description', 'price', 'discount_price', 
                   'is_available', 'slug', 'created_at', 'category', 'brand', 
                   'images', 'category_id', 'brand_id']
         read_only_fields = ['slug', 'created_at']

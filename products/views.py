@@ -15,9 +15,9 @@ class CategoryViewset(viewsets.ModelViewSet):
     pagination_class = LimitOffsetPagination
     permission_classes = [AllowAny]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['name']
-    search_fields = ['name', 'description']
-    ordering_fields = ['name', 'created_at']
+    filterset_fields = ['category_name']
+    search_fields = ['category_name', 'description']
+    ordering_fields = ['category_name', 'created_at']
     ordering = ['-created_at']
     
     
@@ -27,19 +27,20 @@ class BrandViewset(viewsets.ModelViewSet):
     pagination_class = LimitOffsetPagination
     permission_classes = [AllowAny]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['name']
-    search_fields = ['name', 'description']
-    ordering_fields = ['name', 'created_at']
+    filterset_fields = ['band_name']
+    search_fields = ['band_name', 'description']
+    ordering_fields = ['band_name', 'created_at']
     ordering = ['-created_at']
     
     
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     permission_classes = [AllowAny]
+    pagination_class = LimitOffsetPagination
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['category', 'brand', 'is_available']
-    search_fields = ['name', 'description']
-    ordering_fields = ['name', 'price', 'created_at']
+    search_fields = ['product_name', 'description']
+    ordering_fields = ['product_name', 'price', 'created_at']
     ordering = ['-created_at']
     
     def get_serializer_class(self):
@@ -57,7 +58,7 @@ class ProductImageViewSet(viewsets.ModelViewSet):
     serializer_class = ProductImageSerializer
     permission_classes = [IsAdminUser]
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['product']
+    filterset_fields = ['productimg']
 
 
 class SizeViewSet(viewsets.ReadOnlyModelViewSet):
