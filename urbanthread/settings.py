@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'django_filters',
+    'drf_yasg',
     'accounts',
     'products',
     'cart',
@@ -39,6 +40,7 @@ INSTALLED_APPS = [
     'payments',
     'inventory',
     'reviews',
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -131,6 +133,7 @@ REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': (
         'django_filters.rest_framework.DjangoFilterBackend',
     ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 
