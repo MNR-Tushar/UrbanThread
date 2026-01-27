@@ -10,6 +10,11 @@ class Inventory(models.Model):
     quantity=models.PositiveIntegerField(default=0)
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at=models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ['product', 'color', 'size']
+        verbose_name_plural = 'Inventories'
+    
     def __str__(self):
-        return self.name
+        return f"{self.product.product_name} - {self.product.product_name} - {self.color.color} - {self.size.size_type} ({self.quantity})"
 
