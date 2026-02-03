@@ -33,59 +33,60 @@ class OrderViewSet(viewsets.ModelViewSet):
     def create_order(self, request):
         serializer = OrderCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
+
         address_id = serializer.validated_data['address_id']
         payment_method = serializer.validated_data['payment_method']
-        coupon_code = serializer.validated_data['coupon_code']
-        
+        coupon_code = serializer.validated_data.get('coupon_code', '')
+
         user = request.user
-        
+
         try:
-            address=Address.objects.get(id=address_id,user=user)
+            address = Address.objects.get(id=address_id, user=user)
         except Address.DoesNotExist:
             return Response({'error': 'Address not found'}, status=status.HTTP_404_NOT_FOUND)
-        
+
         try:
             cart = Cart.objects.get(user=user)
         except Cart.DoesNotExist:
             return Response({'error': 'Cart not found'}, status=status.HTTP_404_NOT_FOUND)
-        
+
+        cart_items = CartItem.objects.filter(cart=cart)
+
+        if not cart_items.exists():
+            return Response({'error': 'Cart is empty'}, status=status.HTTP_400_BAD_REQUEST)
+
         total_amount = Decimal('0.00')
-        for item in CartItem:
-            price = item.product.discount_price if item.product.discount_price > 0 else item.product.price
-            total_amount += price * item.quantity
-        
-        # Apply coupon if provided
+
+        for item in cart_items:
+            price = item.product.discount_price if item.product.discount_price and item.product.discount_price > 0 else item.product.price
+            total_amount += Decimal(price) * item.quantity
+
         discount = Decimal('0.00')
         if coupon_code:
             try:
                 coupon = Coupon.objects.get(code=coupon_code, is_active=True)
                 from datetime import date
                 if coupon.expiration_date >= date.today():
-                    discount = (total_amount * coupon.discount) / 100
+                    discount = (total_amount * Decimal(coupon.discount)) / 100
                     total_amount -= discount
             except Coupon.DoesNotExist:
                 pass
-        
-        # Create order with transaction
+
         try:
             with transaction.atomic():
-                # Generate order number
                 order_number = f"ORD-{uuid.uuid4().hex[:8].upper()}"
-                
-                # Create order
+
                 order = Order.objects.create(
                     order_number=order_number,
-                    user=request.user,
+                    user=user,
                     total_amount=total_amount,
                     payment_status=False,
                     order_status=False
                 )
-                
-                # Create order items and update inventory
-                for item in CartItem:
-                    price = item.product.discount_price if item.product.discount_price > 0 else item.product.price
-                    
+
+                for item in cart_items:
+                    price = item.product.discount_price if item.product.discount_price and item.product.discount_price > 0 else item.product.price
+
                     OrderItem.objects.create(
                         order=order,
                         product=item.product,
@@ -94,42 +95,37 @@ class OrderViewSet(viewsets.ModelViewSet):
                         quantity=item.quantity,
                         price=price
                     )
-                    
-                    # Update inventory
-                    inventory = Inventory.objects.get(
-                        product=item.product,
-                        color=item.color,
-                        size=item.size
-                    )
-                    
+
+                    try:
+                        inventory = Inventory.objects.get(
+                            product=item.product,
+                            color=item.color,
+                            size=item.size
+                        )
+                    except Inventory.DoesNotExist:
+                        raise Exception(f"Inventory not found for {item.product.name}")
+
                     if inventory.quantity < item.quantity:
                         raise Exception(f"Insufficient stock for {item.product.name}")
-                    
+
                     inventory.quantity -= item.quantity
                     inventory.save()
-                
-                # Create payment record
-                payment_status = True if payment_method == 'cash_on_delivery' else False
+
                 Payment.objects.create(
-                    user=request.user,
+                    user=user,
                     order=order,
                     payment_method=payment_method,
                     tranction_id=f"TXN-{uuid.uuid4().hex[:12].upper()}",
-                    status=payment_status
+                    status=False
                 )
-                
-                # Clear cart
-                CartItem.delete()
-                
-                # Return order
-                order_serializer = OrderSerializer(order)
-                return Response(order_serializer.data, status=status.HTTP_201_CREATED)
-                
+
+                cart_items.delete()
+
+                return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
+
         except Exception as e:
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
     
     @action(detail=True, methods=['patch'])
     def cancel_order(self, request, pk=None):

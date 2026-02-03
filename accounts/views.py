@@ -66,4 +66,18 @@ class Userviewset(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
     serializer_class = CustomUserSerializer
     queryset = User.objects.all()
+
+    def get_object(self):
+        return self.request.user
+
+
+class ProfileViewset(viewsets.ModelViewSet):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = ProfileSerializer
+    queryset = Profile.objects.all()
     
+
+class AddressViewset(viewsets.ModelViewSet):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = AddressSerializer
+    queryset = Address.objects.all()

@@ -5,6 +5,8 @@ from .views import *
 from rest_framework.routers import DefaultRouter
 router = DefaultRouter()
 router.register(r'allusers', Userviewset, basename='user')
+router.register(r'address', AddressViewset, basename='address')
+router.register(r'profile', ProfileViewset, basename='profile')
 app_name = "accounts"
 
 urlpatterns = [
