@@ -21,7 +21,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
     def get_subtotal(self, obj):
         return float(obj.price * obj.quantity)
     
-class OderSerializer(serializers.ModelSerializer):
+class OrderSerializer(serializers.ModelSerializer):
     user=CustomUserSerializer(read_only=True)
     items=OrderItemSerializer(many=True, read_only=True)
     
