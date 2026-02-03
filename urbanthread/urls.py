@@ -9,11 +9,11 @@ from drf_yasg import openapi
 from rest_framework import permissions
 schema_view = get_schema_view(
     openapi.Info(
-        title="Student Management System API",
+        title="Urban Thread API",
         default_version='v1',
-        description="A comprehensive API for managing educational institution data",
+        description="API documentation for Urban Thread",
         terms_of_service="https://www.google.com/policies/terms/",
-        contact=openapi.Contact(email="contact@studentmanagement.local"),
+        contact=openapi.Contact(email=""),
         license=openapi.License(name="MIT License"),
     ),
     public=True,
