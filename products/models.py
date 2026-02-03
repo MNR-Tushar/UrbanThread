@@ -16,7 +16,7 @@ class Category(models.Model):
         super().save(*args, **kwargs)
     
 class Brand(models.Model):
-    band_name=models.CharField(max_length=100)
+    brand_name=models.CharField(max_length=100)
     description=models.TextField(blank=True,null=True)
     slug=models.SlugField(max_length=150,blank=True,unique=True)
     created_at=models.DateTimeField(auto_now_add=True)

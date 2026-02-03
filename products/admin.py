@@ -11,9 +11,9 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Brand)
 class BrandAdmin(admin.ModelAdmin):
-    list_display = ('id','band_name', 'created_at')
+    list_display = ('id','brand_name', 'created_at')
     ordering = ('-created_at',)
-    search_fields = ('band_name', 'description')
+    search_fields = ('brand_name', 'description')
     list_filter = ('created_at',)
 
 @admin.register(Product)
