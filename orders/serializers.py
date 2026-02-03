@@ -35,7 +35,7 @@ class OrderSerializer(serializers.ModelSerializer):
 class OrderCreateSerializer(serializers.Serializer):
     address_id = serializers.IntegerField(required=True)
     coupon_code = serializers.CharField(required=False, allow_blank=True)
-    payment_method = serializers.CharField(required=True)
+    payment_method = serializers.CharField(required=False, allow_blank=True)
     
     def validate_payment_method(self, value):
         allowed_methods = ['cash_on_delivery', 'stripe', 'paypal']

@@ -103,10 +103,10 @@ class OrderViewSet(viewsets.ModelViewSet):
                             size=item.size
                         )
                     except Inventory.DoesNotExist:
-                        raise Exception(f"Inventory not found for {item.product.name}")
+                        raise Exception(f"Inventory not found for {item.product.product_name}")
 
                     if inventory.quantity < item.quantity:
-                        raise Exception(f"Insufficient stock for {item.product.name}")
+                        raise Exception(f"Insufficient stock for {item.product.product_name}")
 
                     inventory.quantity -= item.quantity
                     inventory.save()
