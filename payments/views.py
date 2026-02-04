@@ -65,12 +65,12 @@ class InitiatePaymentView(APIView):
         serializer = InitiatePaymentSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         
-        order_number = serializer.validated_data['order_number']  
+        order_id = serializer.validated_data['order_number']  
         payment_method = serializer.validated_data['payment_method']
         
         try:
             order = Order.objects.select_related('user').get(
-                order_number=order_number,
+                id=order_id,
                 user=request.user
             )
         except Order.DoesNotExist:
@@ -147,10 +147,10 @@ class InitiatePaymentView(APIView):
                 'total_amount': float(order.total_amount),
                 'currency': 'BDT',
                 'tran_id': transaction_id,
-                'success_url': f"{base_url}/api/payments/sslcommerz/success/",
-                'fail_url': f"{base_url}/api/payments/sslcommerz/fail/",
-                'cancel_url': f"{base_url}/api/payments/sslcommerz/cancel/",
-                'ipn_url': f"{base_url}/api/payments/sslcommerz/ipn/",
+                'success_url': f"{base_url}/payments/sslcommerz/success/",
+                'fail_url': f"{base_url}/payments/sslcommerz/fail/",
+                'cancel_url': f"{base_url}/payments/sslcommerz/cancel/",
+                'ipn_url': f"{base_url}/payments/sslcommerz/ipn/",
                 
                 # Customer info
                 'cus_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
@@ -174,10 +174,17 @@ class InitiatePaymentView(APIView):
             response = sslcz.create_session(payment_data)
             
             # Log the initiation
+            log_data = response.copy() if isinstance(response, dict) else {}
+            # Convert Decimal values to strings for JSON serialization
+            if 'total_amount' in log_data:
+                log_data['total_amount'] = str(log_data['total_amount'])
+            if 'amount' in log_data:
+                log_data['amount'] = str(log_data['amount'])
+                
             PaymentLog.objects.create(
                 payment=payment,
                 event_type='payment_initiated',
-                event_data=response,
+                event_data=log_data,
                 ip_address=self.get_client_ip(request),
                 user_agent=request.META.get('HTTP_USER_AGENT', '')
             )
@@ -241,10 +248,19 @@ class SSLCommerzSuccessView(APIView):
             return redirect(f"{settings.FRONTEND_URL}/payment/failed")
         
         # Log the callback
+        callback_log_data = serializer.validated_data.copy() if isinstance(serializer.validated_data, dict) else {}
+        # Convert Decimal values to strings for JSON serialization
+        if 'total_amount' in callback_log_data:
+            callback_log_data['total_amount'] = str(callback_log_data['total_amount'])
+        if 'amount' in callback_log_data:
+            callback_log_data['amount'] = str(callback_log_data['amount'])
+        if 'currency_amount' in callback_log_data:
+            callback_log_data['currency_amount'] = str(callback_log_data['currency_amount'])
+            
         PaymentLog.objects.create(
             payment=payment,
             event_type='success_callback',
-            event_data=serializer.validated_data,
+            event_data=callback_log_data,
             ip_address=self.get_client_ip(request)
         )
         
@@ -254,10 +270,17 @@ class SSLCommerzSuccessView(APIView):
             validation_response = sslcz.validate_payment(val_id, tran_id)
             
             # Log validation
+            validation_log_data = validation_response.copy() if isinstance(validation_response, dict) else {}
+            # Convert Decimal values to strings for JSON serialization
+            if 'total_amount' in validation_log_data:
+                validation_log_data['total_amount'] = str(validation_log_data['total_amount'])
+            if 'amount' in validation_log_data:
+                validation_log_data['amount'] = str(validation_log_data['amount'])
+                
             PaymentLog.objects.create(
                 payment=payment,
                 event_type='validation_response',
-                event_data=validation_response
+                event_data=validation_log_data
             )
             
             if validation_response.get('status') == 'VALID' or validation_response.get('status') == 'VALIDATED':
@@ -317,10 +340,19 @@ class SSLCommerzFailView(APIView):
             payment.save()
             
             # Log the failure
+            fail_log_data = request.data.copy() if isinstance(request.data, dict) else {}
+            # Convert Decimal values to strings for JSON serialization
+            if 'total_amount' in fail_log_data:
+                fail_log_data['total_amount'] = str(fail_log_data['total_amount'])
+            if 'amount' in fail_log_data:
+                fail_log_data['amount'] = str(fail_log_data['amount'])
+            if 'currency_amount' in fail_log_data:
+                fail_log_data['currency_amount'] = str(fail_log_data['currency_amount'])
+                
             PaymentLog.objects.create(
                 payment=payment,
                 event_type='fail_callback',
-                event_data=request.data
+                event_data=fail_log_data
             )
         except Payment.DoesNotExist:
             logger.error(f"Payment not found for failed transaction: {tran_id}")
@@ -343,10 +375,19 @@ class SSLCommerzCancelView(APIView):
             payment.save()
             
             # Log the cancellation
+            cancel_log_data = request.data.copy() if isinstance(request.data, dict) else {}
+            # Convert Decimal values to strings for JSON serialization
+            if 'total_amount' in cancel_log_data:
+                cancel_log_data['total_amount'] = str(cancel_log_data['total_amount'])
+            if 'amount' in cancel_log_data:
+                cancel_log_data['amount'] = str(cancel_log_data['amount'])
+            if 'currency_amount' in cancel_log_data:
+                cancel_log_data['currency_amount'] = str(cancel_log_data['currency_amount'])
+                
             PaymentLog.objects.create(
                 payment=payment,
                 event_type='cancel_callback',
-                event_data=request.data
+                event_data=cancel_log_data
             )
         except Payment.DoesNotExist:
             logger.error(f"Payment not found for cancelled transaction: {tran_id}")
@@ -374,10 +415,19 @@ class SSLCommerzIPNView(APIView):
             return HttpResponse('FAILED')
         
         # Log IPN
+        ipn_log_data = request.data.copy() if isinstance(request.data, dict) else {}
+        # Convert Decimal values to strings for JSON serialization
+        if 'total_amount' in ipn_log_data:
+            ipn_log_data['total_amount'] = str(ipn_log_data['total_amount'])
+        if 'amount' in ipn_log_data:
+            ipn_log_data['amount'] = str(ipn_log_data['amount'])
+        if 'currency_amount' in ipn_log_data:
+            ipn_log_data['currency_amount'] = str(ipn_log_data['currency_amount'])
+            
         PaymentLog.objects.create(
             payment=payment,
             event_type='ipn_received',
-            event_data=request.data
+            event_data=ipn_log_data
         )
         
         # Validate the payment
@@ -385,10 +435,17 @@ class SSLCommerzIPNView(APIView):
             sslcz = SSLCommerzPayment()
             validation_response = sslcz.validate_payment(val_id, tran_id)
             
+            ipn_validation_log_data = validation_response.copy() if isinstance(validation_response, dict) else {}
+            # Convert Decimal values to strings for JSON serialization
+            if 'total_amount' in ipn_validation_log_data:
+                ipn_validation_log_data['total_amount'] = str(ipn_validation_log_data['total_amount'])
+            if 'amount' in ipn_validation_log_data:
+                ipn_validation_log_data['amount'] = str(ipn_validation_log_data['amount'])
+                
             PaymentLog.objects.create(
                 payment=payment,
                 event_type='ipn_validation',
-                event_data=validation_response
+                event_data=ipn_validation_log_data
             )
             
             if validation_response.get('status') in ['VALID', 'VALIDATED']:
