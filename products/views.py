@@ -27,9 +27,9 @@ class BrandViewset(viewsets.ModelViewSet):
     pagination_class = LimitOffsetPagination
     permission_classes = [AllowAny]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['band_name']
-    search_fields = ['band_name', 'description']
-    ordering_fields = ['band_name', 'created_at']
+    filterset_fields = ['brand_name']
+    search_fields = ['brand_name', 'description']
+    ordering_fields = ['brand_name', 'created_at']
     ordering = ['-created_at']
     
     

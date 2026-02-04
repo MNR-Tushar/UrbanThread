@@ -40,7 +40,7 @@ class CategoryMiniSerializer(serializers.ModelSerializer):
 class BrandMiniSerializer(serializers.ModelSerializer):
     class Meta:
         model = Brand
-        fields = ["id", "band_name"]
+        fields = ["id", "brand_name"]
 
 class ProductListSerializer(serializers.ModelSerializer):
     category = CategoryMiniSerializer(read_only=True)
