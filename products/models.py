@@ -22,11 +22,11 @@ class Brand(models.Model):
     created_at=models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.band_name
+        return self.brand_name
     
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(f"{self.band_name}-{uuid.uuid4().hex[:6]}")
+            self.slug = slugify(f"{self.brand_name}-{uuid.uuid4().hex[:6]}")
         super().save(*args, **kwargs)
     
 class Product(models.Model):
