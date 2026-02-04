@@ -7,9 +7,7 @@ router.register(r'', PaymentViewSet, basename='payment')
 app_name = 'payments'
 
 urlpatterns = [
-    path('', include(router.urls)),
-    
-    # Payment initiation
+    # Payment initiation - must come before router
     path('initiate/', InitiatePaymentView.as_view(), name='initiate-payment'),
     
     # SSL Commerce callbacks
@@ -20,4 +18,7 @@ urlpatterns = [
     
     # Refund
     path('refund/', RefundPaymentView.as_view(), name='refund-payment'),
+    
+    # Router for viewset - must come after specific paths
+    path('', include(router.urls)),
 ]

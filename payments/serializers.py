@@ -35,20 +35,20 @@ class PaymentLogSerializer(serializers.ModelSerializer):
 
 class InitiatePaymentSerializer(serializers.Serializer):
     """Serializer for initiating SSL Commerce payment"""
-    order_id = serializers.IntegerField(required=True)
+    order_number = serializers.CharField(required=True)
     payment_method = serializers.ChoiceField(
         choices=['sslcommerz', 'cash_on_delivery'],
         default='sslcommerz'
     )
     
-    def validate_order_id(self, value):
+    def validate_order_number(self, value):
         from orders.models import Order
         try:
-            order = Order.objects.get(id=value, user=self.context['request'].user)
+            order = Order.objects.get(order_number=value, user=self.context['request'].user)
             if hasattr(order, 'payment'):
                 if order.payment.status == 'completed':
                     raise serializers.ValidationError("This order has already been paid")
-            return value
+            return order.id  # Return order ID for later use
         except Order.DoesNotExist:
             raise serializers.ValidationError("Order not found")
 

@@ -65,12 +65,12 @@ class InitiatePaymentView(APIView):
         serializer = InitiatePaymentSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         
-        order_id = serializer.validated_data['order_id']
+        order_number = serializer.validated_data['order_number']  
         payment_method = serializer.validated_data['payment_method']
         
         try:
             order = Order.objects.select_related('user').get(
-                id=order_id,
+                order_number=order_number,
                 user=request.user
             )
         except Order.DoesNotExist:

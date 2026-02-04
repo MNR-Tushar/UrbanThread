@@ -38,7 +38,7 @@ class OrderCreateSerializer(serializers.Serializer):
     payment_method = serializers.CharField(required=False, allow_blank=True)
     
     def validate_payment_method(self, value):
-        allowed_methods = ['cash_on_delivery', 'stripe', 'paypal']
+        allowed_methods = ['cash_on_delivery', 'sslcommerz']
         if value not in allowed_methods:
             raise serializers.ValidationError(
                 f"Payment method must be one of: {', '.join(allowed_methods)}"

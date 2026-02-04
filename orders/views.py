@@ -115,8 +115,9 @@ class OrderViewSet(viewsets.ModelViewSet):
                     user=user,
                     order=order,
                     payment_method=payment_method,
-                    tranction_id=f"TXN-{uuid.uuid4().hex[:12].upper()}",
-                    status=False
+                    transaction_id=f"TXN-{uuid.uuid4().hex[:12].upper()}",
+                    amount=total_amount,
+                    status='pending'
                 )
 
                 cart_items.delete()

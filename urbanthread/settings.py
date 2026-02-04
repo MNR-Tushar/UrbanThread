@@ -174,6 +174,9 @@ SSLCOMMERZ_STORE_ID = config('SSLCOMMERZ_STORE_ID', default='')
 SSLCOMMERZ_STORE_PASSWORD = config('SSLCOMMERZ_STORE_PASSWORD', default='')
 SSLCOMMERZ_IS_SANDBOX = config('SSLCOMMERZ_IS_SANDBOX', default=True, cast=bool)
 
+# Frontend URL for payment redirects
+FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
+
 # Email Configuration
 EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
