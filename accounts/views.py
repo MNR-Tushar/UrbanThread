@@ -69,15 +69,37 @@ class Userviewset(viewsets.ModelViewSet):
 
     def get_object(self):
         return self.request.user
+    
+    def get_queryset(self):
+        user = self.request.user
+
+        if user.is_staff:
+            return User.objects.all()
+
+        return User.objects.filter(id=user.id)
 
 
 class ProfileViewset(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
     serializer_class = ProfileSerializer
-    queryset = Profile.objects.all()
+    
+    def get_queryset(self):
+        user = self.request.user
+
+        if user.is_staff:
+            return Profile.objects.all()
+
+        return Profile.objects.filter(user=user)
+    
     
 
 class AddressViewset(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
     serializer_class = AddressSerializer
-    queryset = Address.objects.all()
+    def get_queryset(self):
+        user = self.request.user
+
+        if user.is_staff:
+            return Address.objects.all()
+
+        return Address.objects.filter(user=user)
