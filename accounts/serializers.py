@@ -43,8 +43,10 @@ class UserLoginSerializer(serializers.Serializer):
     
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
-        model = CustomUser
-        fields = ['id', 'email', 'phone', 'first_name', 'last_name', 'address']
+        model = Profile
+        fields ='__all__'
+        read_only_fields = ("created_at", "updated_at")
+        
         
 class AddressSerializer(serializers.ModelSerializer):
     class Meta:
