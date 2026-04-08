@@ -1,84 +1,94 @@
 from django.db import models
 import uuid
 from django.utils.text import slugify
+
+
 class Category(models.Model):
-    category_name=models.CharField(max_length=100)
-    description=models.TextField(blank=True,null=True)
-    slug=models.SlugField(max_length=150,blank=True,unique=True)
-    created_at=models.DateTimeField(auto_now_add=True)
+    category_name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
+    slug = models.SlugField(max_length=150, blank=True, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.category_name
-    
+
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(f"{self.category_name}-{uuid.uuid4().hex[:6]}")
         super().save(*args, **kwargs)
-    
+
+
 class Brand(models.Model):
-    brand_name=models.CharField(max_length=100)
-    description=models.TextField(blank=True,null=True)
-    slug=models.SlugField(max_length=150,blank=True,unique=True)
-    created_at=models.DateTimeField(auto_now_add=True)
+    brand_name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
+    slug = models.SlugField(max_length=150, blank=True, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.brand_name
-    
+
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(f"{self.brand_name}-{uuid.uuid4().hex[:6]}")
         super().save(*args, **kwargs)
-    
+
+
 class Product(models.Model):
-    product_name=models.CharField(max_length=100)
-    description=models.TextField(blank=True,null=True)
+    product_name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    discount_price = models.DecimalField(max_digits=10, decimal_places=2)
+    # FIX: allow null/blank so a product can have no discount; default=0 keeps
+    # the existing > 0 checks in cart/order logic working correctly.
+    discount_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, default=0)
     is_available = models.BooleanField(default=True)
-    slug=models.SlugField(max_length=150,blank=True,unique=True)
-    created_at=models.DateTimeField(auto_now_add=True)
-    
-    category=models.ForeignKey(Category, on_delete=models.CASCADE)
-    brand=models.ForeignKey(Brand, on_delete=models.CASCADE)
+    slug = models.SlugField(max_length=150, blank=True, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    category = models.ForeignKey(Category, on_delete=models.CASCADE)
+    brand = models.ForeignKey(Brand, on_delete=models.CASCADE)
 
     def __str__(self):
         return self.product_name
-    
+
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(f"{self.product_name}-{uuid.uuid4().hex[:6]}")
         super().save(*args, **kwargs)
 
+
 class ProductImage(models.Model):
-    productimg=models.ForeignKey(Product, on_delete=models.CASCADE)
-    image=models.ImageField(upload_to='product_images/', blank=True, null=True)
-    created_at=models.DateTimeField(auto_now_add=True)
-    
+    productimg = models.ForeignKey(Product, on_delete=models.CASCADE)
+    image = models.ImageField(upload_to='product_images/', blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    # FIX: was using self.product which does not exist; field is named productimg
     def __str__(self):
-        return f"Image for {self.product.product_name}"
+        return f"Image for {self.productimg.product_name}"
+
 
 class Size(models.Model):
-    S="Small"
-    M="Medium"
-    L="Large"
-    XL="Extra Large"
-    XXL="Extra Extra Large"
-    size_choices=(
-        (S,"Small"),
-        (M,"Medium"),
-        (L,"Large"),
-        (XL,"Extra Large"),
-        (XXL,"Extra Extra Large"),
+    S = "Small"
+    M = "Medium"
+    L = "Large"
+    XL = "Extra Large"
+    XXL = "Extra Extra Large"
+    size_choices = (
+        (S, "Small"),
+        (M, "Medium"),
+        (L, "Large"),
+        (XL, "Extra Large"),
+        (XXL, "Extra Extra Large"),
     )
-    size_type=models.CharField(max_length=100,choices=size_choices)
-    created_at=models.DateTimeField(auto_now_add=True)
+    size_type = models.CharField(max_length=100, choices=size_choices)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.size_type
-    
+
+
 class Color(models.Model):
-    color=models.CharField(max_length=100)
-    created_at=models.DateTimeField(auto_now_add=True)
+    color = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.color

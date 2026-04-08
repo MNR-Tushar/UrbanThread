@@ -103,3 +103,6 @@ class AddressViewset(viewsets.ModelViewSet):
             return Address.objects.all()
 
         return Address.objects.filter(user=user)
+    
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)

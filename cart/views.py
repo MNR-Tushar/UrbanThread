@@ -102,21 +102,35 @@ class CartViewSet(viewsets.GenericViewSet):
     def update_item(self, request):
         item_id = request.data.get('item_id')
         quantity = request.data.get('quantity')
-        
+ 
+        if not quantity or int(quantity) < 1:
+            return Response({'error': 'Quantity must be at least 1'}, status=status.HTTP_400_BAD_REQUEST)
+ 
         try:
-            cart_item = CartItem.objects.get(
-                id=item_id,
-                cart__user=request.user
-            )
-            cart_item.quantity = quantity
-            cart_item.save()
-            serializer = CartItemSerializer(cart_item)
-            return Response(serializer.data)
+            cart_item = CartItem.objects.get(id=item_id, cart__user=request.user)
         except CartItem.DoesNotExist:
-            return Response(
-                {'error': 'Cart item not found'},
-                status=status.HTTP_404_NOT_FOUND
+            return Response({'error': 'Cart item not found'}, status=status.HTTP_404_NOT_FOUND)
+ 
+        # FIX: validate stock before allowing quantity update
+        try:
+            inventory = Inventory.objects.get(
+                product=cart_item.product,
+                color=cart_item.color,
+                size=cart_item.size
             )
+        except Inventory.DoesNotExist:
+            return Response({'error': 'Product variant no longer available'}, status=status.HTTP_400_BAD_REQUEST)
+ 
+        if inventory.quantity < int(quantity):
+            return Response(
+                {'error': 'Not enough stock', 'available_stock': inventory.quantity},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+ 
+        cart_item.quantity = int(quantity)
+        cart_item.save()
+        serializer = CartItemSerializer(cart_item)
+        return Response(serializer.data)
     
     @action(detail=False, methods=['delete'])
     def remove_item(self, request):

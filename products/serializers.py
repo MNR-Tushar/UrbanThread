@@ -1,17 +1,20 @@
 from rest_framework import serializers
 from .models import *
 
+
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         fields = '__all__'
-        read_only_fields = ('slug','created_at',)
-        
+        read_only_fields = ('slug', 'created_at',)
+
+
 class BrandSerializer(serializers.ModelSerializer):
     class Meta:
         model = Brand
         fields = '__all__'
-        read_only_fields = ('slug','created_at',)
+        read_only_fields = ('slug', 'created_at',)
+
 
 class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -19,18 +22,21 @@ class ProductImageSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ('created_at',)
 
+
 class SizeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Size
         fields = '__all__'
         read_only_fields = ('created_at',)
 
+
 class ColorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Color
         fields = '__all__'
         read_only_fields = ('created_at',)
-        
+
+
 class CategoryMiniSerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
@@ -42,30 +48,32 @@ class BrandMiniSerializer(serializers.ModelSerializer):
         model = Brand
         fields = ["id", "brand_name"]
 
+
 class ProductListSerializer(serializers.ModelSerializer):
     category = CategoryMiniSerializer(read_only=True)
     brand = BrandMiniSerializer(read_only=True)
+    # FIX: source was 'images' (nonexistent); correct reverse accessor is 'productimage_set'
+    images = ProductImageSerializer(many=True, read_only=True, source='productimage_set')
 
-    
-    images=ProductImageSerializer(many=True, read_only=True)
     class Meta:
         model = Product
-        fields ='__all__'
-        read_only_fields = ('created_at','slug')
-        
+        fields = '__all__'
+        read_only_fields = ('created_at', 'slug')
+
+
 class ProductDetailSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
     brand = BrandSerializer(read_only=True)
     images = ProductImageSerializer(many=True, read_only=True, source='productimage_set')
     category_id = serializers.IntegerField(write_only=True)
     brand_id = serializers.IntegerField(write_only=True)
-    
+
     class Meta:
         model = Product
-        fields = ['id', 'product_name', 'description', 'price', 'discount_price', 
-                  'is_available', 'slug', 'created_at', 'category', 'brand', 
+        fields = ['id', 'product_name', 'description', 'price', 'discount_price',
+                  'is_available', 'slug', 'created_at', 'category', 'brand',
                   'images', 'category_id', 'brand_id']
         read_only_fields = ['slug', 'created_at']
-    
+
     def create(self, validated_data):
         return Product.objects.create(**validated_data)

@@ -1,5 +1,4 @@
-
-from rest_framework import viewsets,status
+from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
@@ -8,15 +7,13 @@ from django.db import transaction
 from decimal import Decimal
 import uuid
 
-from .serializers import *
-from .models import *
-from cart.models import *
-from inventory.models import *
-from products.models import *
-from accounts.models import *
-from payments.models import *
-from coupons.models import *
-
+from .serializers import OrderSerializer, OrderCreateSerializer
+from .models import Order, OrderItem
+from cart.models import Cart, CartItem
+from inventory.models import Inventory
+from accounts.models import Address
+from payments.models import Payment
+from coupons.models import Coupon
 
 
 class OrderViewSet(viewsets.GenericViewSet):
@@ -27,8 +24,7 @@ class OrderViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         user = self.request.user
         return Order.objects.filter(user=user).order_by('-created_at')
-    
-    
+
     @action(detail=False, methods=['post'])
     def create_order(self, request):
         serializer = OrderCreateSerializer(data=request.data)
@@ -56,7 +52,6 @@ class OrderViewSet(viewsets.GenericViewSet):
             return Response({'error': 'Cart is empty'}, status=status.HTTP_400_BAD_REQUEST)
 
         total_amount = Decimal('0.00')
-
         for item in cart_items:
             price = item.product.discount_price if item.product.discount_price and item.product.discount_price > 0 else item.product.price
             total_amount += Decimal(price) * item.quantity
@@ -80,8 +75,9 @@ class OrderViewSet(viewsets.GenericViewSet):
                     order_number=order_number,
                     user=user,
                     total_amount=total_amount,
-                    payment_status=False,
-                    order_status=False
+                    # FIX: use CharField values instead of booleans
+                    payment_status='unpaid',
+                    order_status='pending'
                 )
 
                 for item in cart_items:
@@ -127,21 +123,20 @@ class OrderViewSet(viewsets.GenericViewSet):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-    
     @action(detail=True, methods=['patch'])
     def cancel_order(self, request, pk=None):
         try:
             order = Order.objects.get(id=pk, user=request.user)
-            
-            if order.order_status:
+
+            # FIX: check order_status string value, not boolean
+            if order.order_status in ['completed', 'cancelled']:
                 return Response(
-                    {'error': 'Cannot cancel completed order'},
+                    {'error': f'Cannot cancel an order with status: {order.order_status}'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            
-            # Restore inventory
+
             with transaction.atomic():
-                for item in order.orderitem_set.all():
+                for item in order.items.all():
                     inventory = Inventory.objects.get(
                         product=item.product,
                         color=item.color,
@@ -149,18 +144,16 @@ class OrderViewSet(viewsets.GenericViewSet):
                     )
                     inventory.quantity += item.quantity
                     inventory.save()
-                
-                order.order_status = True  # Mark as cancelled/completed
+
+                # FIX: set to 'cancelled', not True
+                order.order_status = 'cancelled'
                 order.save()
-            
+
             return Response({'message': 'Order cancelled successfully'})
-            
+
         except Order.DoesNotExist:
-            return Response(
-                {'error': 'Order not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-    
+            return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+
     @action(detail=False, methods=['get'])
     def order_history(self, request):
         orders = self.get_queryset()

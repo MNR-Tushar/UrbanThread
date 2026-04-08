@@ -1,42 +1,42 @@
 from rest_framework import serializers
-from .models import *
-from products.serializers import *
+from .models import Order, OrderItem
+from products.serializers import ProductListSerializer, ColorSerializer, SizeSerializer
 from accounts.serializers import CustomUserSerializer
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
-    product=ProductListSerializer(read_only=True)
-    color=ColorSerializer(read_only=True)
-    size=SizeSerializer(read_only=True)
-    subtotal=serializers.SerializerMethodField()
+    product = ProductListSerializer(read_only=True)
+    color = ColorSerializer(read_only=True)
+    size = SizeSerializer(read_only=True)
+    subtotal = serializers.SerializerMethodField()
 
-   
-    
     class Meta:
         model = OrderItem
         fields = ['id', 'order', 'product', 'color', 'size', 'quantity', 'price', 'subtotal', 'created_at', 'updated_at']
         read_only_fields = ['order', 'created_at', 'updated_at']
-    
-    
+
     def get_subtotal(self, obj):
         return float(obj.price * obj.quantity)
-    
+
+
 class OrderSerializer(serializers.ModelSerializer):
-    user=CustomUserSerializer(read_only=True)
-    items=OrderItemSerializer(many=True, read_only=True)
-    
+    user = CustomUserSerializer(read_only=True)
+    # FIX: related_name on OrderItem FK is now 'items' (set in orders/models.py)
+    items = OrderItemSerializer(many=True, read_only=True)
+
     class Meta:
         model = Order
-        fields = ['id', 'order_number','user','total_amount', 'payment_status', 'order_status', 'items','created_at', 'updated_at']
+        fields = ['id', 'order_number', 'user', 'total_amount', 'payment_status',
+                  'order_status', 'items', 'created_at', 'updated_at']
         read_only_fields = ['order_number', 'user', 'created_at', 'updated_at']
-        
-        
+
 
 class OrderCreateSerializer(serializers.Serializer):
     address_id = serializers.IntegerField(required=True)
     coupon_code = serializers.CharField(required=False, allow_blank=True)
-    payment_method = serializers.CharField(required=False, allow_blank=True)
-    
+    # FIX: payment_method is required and does not allow blank
+    payment_method = serializers.CharField(required=True)
+
     def validate_payment_method(self, value):
         allowed_methods = ['cash_on_delivery', 'sslcommerz']
         if value not in allowed_methods:

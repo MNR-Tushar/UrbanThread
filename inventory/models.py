@@ -16,5 +16,5 @@ class Inventory(models.Model):
         verbose_name_plural = 'Inventories'
     
     def __str__(self):
-        return f"{self.product.product_name} - {self.product.product_name} - {self.color.color} - {self.size.size_type} ({self.quantity})"
+        return f"{self.product.product_name} - {self.color.color} - {self.size.size_type} ({self.quantity})"
 

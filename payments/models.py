@@ -74,8 +74,9 @@ class Payment(models.Model):
         self.completed_at = timezone.now()
         self.save()
         
-        # Update order status
-        self.order.payment_status = True
+        # FIX: order.payment_status is now a CharField ('paid'), not a boolean
+        self.order.payment_status = 'paid'
+        self.order.order_status = 'processing'
         self.order.save()
     
     def mark_as_failed(self, error_message=None):
