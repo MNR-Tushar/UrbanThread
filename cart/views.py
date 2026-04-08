@@ -8,7 +8,7 @@ from .serializers import CartSerializer, CartItemSerializer
 from products.models import Product, Color, Size
 
 
-class CartViewSet(viewsets.ModelViewSet):
+class CartViewSet(viewsets.GenericViewSet):
     serializer_class = CartSerializer
     permission_classes = [IsAuthenticated]
     
