@@ -302,7 +302,8 @@ class SSLCommerzSuccessView(APIView):
                     payment.save()
                     
                     # Update order
-                    payment.order.payment_status = True
+                    payment.order.payment_status = 'paid'
+                    payment.order.order_status = 'processing'
                     payment.order.save()
                 
                 return redirect(
@@ -507,7 +508,7 @@ class RefundPaymentView(APIView):
             payment.save()
             
             # Update order
-            payment.order.payment_status = False
+            payment.order.payment_status = 'refunded'
             payment.order.save()
             
             return Response({

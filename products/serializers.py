@@ -72,7 +72,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         model = Product
         fields = ['id', 'product_name', 'description', 'price', 'discount_price',
                   'is_available', 'slug', 'created_at', 'category', 'brand',
-                  'images', 'category_id', 'brand_id']
+                  'images', 'category_id', 'brand_id','updated_at']
         read_only_fields = ['slug', 'created_at']
 
     def create(self, validated_data):

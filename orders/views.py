@@ -137,13 +137,16 @@ class OrderViewSet(viewsets.GenericViewSet):
 
             with transaction.atomic():
                 for item in order.items.all():
-                    inventory = Inventory.objects.get(
-                        product=item.product,
-                        color=item.color,
-                        size=item.size
-                    )
-                    inventory.quantity += item.quantity
-                    inventory.save()
+                    try:
+                        inventory = Inventory.objects.get(
+                            product=item.product,
+                            color=item.color,
+                            size=item.size
+                        )
+                        inventory.quantity += item.quantity
+                        inventory.save()
+                    except Inventory.DoesNotExist:
+                        return Response({'error': 'Inventory not found'}, status=status.HTTP_404_NOT_FOUND)
 
                 # FIX: set to 'cancelled', not True
                 order.order_status = 'cancelled'

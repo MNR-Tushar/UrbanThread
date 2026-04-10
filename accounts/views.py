@@ -90,7 +90,8 @@ class ProfileViewset(viewsets.ModelViewSet):
             return Profile.objects.all()
 
         return Profile.objects.filter(user=user)
-    
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
     
 
 class AddressViewset(viewsets.ModelViewSet):

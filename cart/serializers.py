@@ -21,7 +21,7 @@ class CartItemSerializer(serializers.ModelSerializer):
         read_only_fields = ['cart', 'created_at', 'updated_at']
     
     def get_subtotal(self, obj):
-        price = obj.product.discount_price if obj.product.discount_price > 0 else obj.product.price
+        price = obj.product.discount_price if obj.product.discount_price and obj.product.discount_price > 0 else obj.product.price
         return float(price * obj.quantity)
     
     def validate(self, data):
@@ -30,7 +30,6 @@ class CartItemSerializer(serializers.ModelSerializer):
         size_id = data.get('size_id')
         quantity = data.get('quantity', 1)
         
-        # Check inventory
         try:
             inventory = Inventory.objects.get(
                 product_id=product_id,
@@ -48,7 +47,7 @@ class CartItemSerializer(serializers.ModelSerializer):
 
 
 class CartSerializer(serializers.ModelSerializer):
-    items = CartItemSerializer(many=True, read_only=True, source='cartitem_set')
+    items = CartItemSerializer(many=True, read_only=True)
     total_items = serializers.SerializerMethodField()
     total_amount = serializers.SerializerMethodField()
     
@@ -59,11 +58,11 @@ class CartSerializer(serializers.ModelSerializer):
         read_only_fields = ['user', 'created_at', 'updated_at']
     
     def get_total_items(self, obj):
-        return obj.cartitem_set.count()
+        return obj.items.count()
     
     def get_total_amount(self, obj):
         total = 0
-        for item in obj.cartitem_set.all():
-            price = item.product.discount_price if item.product.discount_price > 0 else item.product.price
+        for item in obj.items.all():
+            price = item.product.discount_price if item.product.discount_price and item.product.discount_price > 0 else item.product.price
             total += price * item.quantity
         return float(total)
