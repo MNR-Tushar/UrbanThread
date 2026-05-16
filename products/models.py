@@ -43,7 +43,7 @@ class Product(models.Model):
     is_available = models.BooleanField(default=True)
     slug = models.SlugField(max_length=150, blank=True, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    update_at = models.DateTimeField(auto_now=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     category = models.ForeignKey(Category, on_delete=models.CASCADE)
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE)
