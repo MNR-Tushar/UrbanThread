@@ -1,0 +1,216 @@
+name: Urban Thread — CI / CD
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Environment variables available to all jobs
+# ──────────────────────────────────────────────────────────────────────────────
+env:
+  IMAGE_NAME: urbanthread
+  REGISTRY: ghcr.io                        # GitHub Container Registry
+  FULL_IMAGE: ghcr.io/${{ github.repository_owner }}/urbanthread
+  
+
+# ──────────────────────────────────────────────────────────────────────────────
+# JOB 1 — Lint & Test
+# ──────────────────────────────────────────────────────────────────────────────
+jobs:
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ${{secrets.DB_USER}}
+          POSTGRES_PASSWORD: ${{secrets.DB_PASSWORD}}
+          POSTGRES_DB: ${{secrets.DB_NAME}}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      DEBUG: "True"
+      ALLOWED_HOSTS: "localhost,127.0.0.1"
+
+      DB_ENGINE: django.db.backends.postgresql
+      DB_NAME: ${{ secrets.DB_NAME }}
+      DB_USER: ${{ secrets.DB_USER }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      DB_HOST: localhost
+      DB_PORT: 5432
+
+      REDIS_URL: redis://redis:6379/0
+
+      SSLCOMMERZ_STORE_ID: ${{ secrets.SSLCOMMERZ_STORE_ID }}
+      SSLCOMMERZ_STORE_PASSWORD: ${{ secrets.SSLCOMMERZ_STORE_PASSWORD }}
+      SSLCOMMERZ_IS_SANDBOX: "True"
+
+      FRONTEND_URL: "http://localhost:3000"
+
+      EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
+      EMAIL_HOST: smtp.gmail.com
+      EMAIL_PORT: "587"
+      EMAIL_USE_TLS: "True"
+      EMAIL_HOST_USER: ${{ secrets.EMAIL_HOST_USER }}
+      EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
+      DEFAULT_FROM_EMAIL: ${{ secrets.DEFAULT_FROM_EMAIL }}
+
+    steps:
+      # ── Checkout ─────────────────────────────────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── Python setup ─────────────────────────────────────────────────────────
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # ── Install dependencies ──────────────────────────────────────────────────
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # ── Lint with flake8 ─────────────────────────────────────────────────────
+      - name: Lint with flake8
+        run: |
+          pip install flake8
+          # Stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Treat all other issues as warnings
+          flake8 . --count --exit-zero --max-complexity=12 --max-line-length=120 --statistics
+
+      # ── Django system checks ──────────────────────────────────────────────────
+      - name: Django system check
+        run: python manage.py check
+
+      # ── Run migrations ────────────────────────────────────────────────────────
+      - name: Run migrations
+        run: python manage.py migrate --noinput
+
+      # ── Run tests ─────────────────────────────────────────────────────────────
+      - name: Run Django tests
+        run: python manage.py test --verbosity=2
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # JOB 2 — Build & Push Docker image (only on push to main/master)
+  # ──────────────────────────────────────────────────────────────────────────────
+  build:
+    name: Build & Push Image
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+
+    permissions:
+      contents: read
+      packages: write        # Required to push to GHCR
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── Docker Buildx ─────────────────────────────────────────────────────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── Login to GitHub Container Registry ────────────────────────────────────
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Extract metadata (tags) ────────────────────────────────────────────────
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.FULL_IMAGE }}
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # ── Build & Push ───────────────────────────────────────────────────────────
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          dockerfile: Dockerfile
+          target: runtime
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # JOB 3 — Deploy to production server via SSH
+  # ──────────────────────────────────────────────────────────────────────────────
+  # deploy:
+  #   name: Deploy to Production
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+
+  #   environment:
+  #     name: production
+  #     url: ${{ secrets.PRODUCTION_URL }}
+
+  #   steps:
+  #     - name: Deploy via SSH
+  #       uses: appleboy/ssh-action@v1.0.3
+  #       with:
+  #         host: ${{ secrets.SSH_HOST }}
+  #         username: ${{ secrets.SSH_USERNAME }}
+  #         key: ${{ secrets.SSH_PRIVATE_KEY }}
+  #         port: ${{ secrets.SSH_PORT || 22 }}
+  #         script: |
+  #           set -e
+
+  #           echo "━━━━ Pulling latest image ━━━━"
+  #           docker pull ${{ env.FULL_IMAGE }}:latest
+
+  #           echo "━━━━ Navigating to project directory ━━━━"
+  #           cd ${{ secrets.DEPLOY_PATH }}
+
+  #           echo "━━━━ Pulling latest docker-compose config from repo ━━━━"
+  #           git pull origin ${{ github.ref_name }}
+
+  #           echo "━━━━ Recreating containers ━━━━"
+  #           docker compose pull
+  #           docker compose up -d --force-recreate --no-build
+
+  #           echo "━━━━ Running migrations ━━━━"
+  #           docker compose exec -T web python manage.py migrate --noinput
+
+  #           echo "━━━━ Collecting static files ━━━━"
+  #           docker compose exec -T web python manage.py collectstatic --noinput
+
+  #           echo "━━━━ Removing old images ━━━━"
+  #           docker image prune -f
+
+  #           echo "Deployment complete!"

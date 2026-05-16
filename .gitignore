@@ -1,4 +1,3 @@
 db.sqlite3
 .env
 populate_test_data.py
-.github/
