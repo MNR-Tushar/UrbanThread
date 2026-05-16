@@ -155,7 +155,7 @@ class CartViewSet(viewsets.GenericViewSet):
     @action(detail=False, methods=['delete'])
     def clear_cart(self, request):
         cart = self.get_or_create_cart()
-        cart.cartitem_set.all().delete()
+        cart.items.all().delete()
         return Response(
             {'message': 'Cart cleared'},
             status=status.HTTP_204_NO_CONTENT
