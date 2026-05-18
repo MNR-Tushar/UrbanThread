@@ -61,6 +61,12 @@ class CartViewSet(viewsets.GenericViewSet):
                 {'error': 'Invalid product/color/size/quantity'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        
+        if quantity < 1:
+            return Response(
+                {'error': 'Quantity must be at least 1'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         inventory = Inventory.objects.filter(
             product_id=product_id,
@@ -119,9 +125,16 @@ class CartViewSet(viewsets.GenericViewSet):
     @action(detail=False, methods=['patch'])
     def update_item(self, request):
         item_id  = request.data.get('item_id')
-        quantity = request.data.get('quantity')
+        raw_quantity = request.data.get('quantity')
+        try:
+            quantity = int(raw_quantity)
+        except (TypeError, ValueError):
+            return Response(
+                {'error': 'Quantity must be a valid integer'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        if not quantity or int(quantity) < 1:
+        if quantity < 1:
             return Response(
                 {'error': 'Quantity must be at least 1'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -144,13 +157,13 @@ class CartViewSet(viewsets.GenericViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if inventory.quantity < int(quantity):
+        if inventory.quantity < quantity:
             return Response(
                 {'error': 'Not enough stock', 'available_stock': inventory.quantity},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        cart_item.quantity = int(quantity)
+        cart_item.quantity = quantity
         cart_item.save()
 
         self._invalidate_cart_cache()

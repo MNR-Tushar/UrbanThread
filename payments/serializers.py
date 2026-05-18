@@ -7,7 +7,10 @@ class PaymentSerializer(serializers.ModelSerializer):
     order = OrderSerializer(read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     payment_method_display = serializers.CharField(source='get_payment_method_display', read_only=True)
-    is_successful = serializers.BooleanField(read_only=True)
+    is_successful = serializers.SerializerMethodField()
+
+    def get_is_successful(self, obj):
+        return obj.is_successful()
     
     class Meta:
         model = Payment
