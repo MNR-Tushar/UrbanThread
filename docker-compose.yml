@@ -51,6 +51,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
+      - .:/app
       - media_files:/app/media
       - static_files:/app/staticfiles
     networks:
@@ -90,6 +91,7 @@ services:
       REDIS_URL: redis://redis:6379/0
     command: celery -A urbanthread worker --loglevel=info
     volumes:
+      - .:/app
       - media_files:/app/media
     networks:
       - backend
@@ -113,6 +115,7 @@ services:
       REDIS_URL: redis://redis:6379/0
     command: celery -A urbanthread beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     volumes:
+      - .:/app
       - media_files:/app/media
     networks:
       - backend
@@ -137,6 +140,8 @@ services:
     command: celery -A urbanthread flower --port=5555
     ports:
       - "5555:5555"
+    volumes:
+      - .:/app
     networks:
       - backend
     depends_on:
