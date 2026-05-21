@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from django.core.cache import cache
 from datetime import date
+from drf_spectacular.utils import extend_schema
 
 from .serializers import CouponSerializer, CouponValidationSerializer
 from .models import Coupon
@@ -25,6 +26,7 @@ COUPON_CACHE_TTL    = 60 * 30   # 30 minutes
 VALIDATE_CACHE_TTL  = 60 * 5    # 5 minutes 
 
 
+@extend_schema(tags=["Coupons"])
 class CouponViewset(viewsets.ModelViewSet):
     queryset = Coupon.objects.all()
     serializer_class = CouponSerializer

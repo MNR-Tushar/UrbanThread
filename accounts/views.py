@@ -5,6 +5,7 @@ from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
+from drf_spectacular.utils import extend_schema, extend_schema_view
 
 from .serializers import *
 from .models import Profile, Address
@@ -20,6 +21,7 @@ class UserRegisterationAPIView(GenericAPIView):
     permission_classes = (AllowAny,)
     serializer_class =UserRegisterationSerializer
 
+    @extend_schema(tags=["Accounts - Register"])
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -41,7 +43,7 @@ class UserLoginAPIView(GenericAPIView):
     permission_classes = (AllowAny,)
     serializer_class = UserLoginSerializer
     
-
+    @extend_schema(tags=["Accounts - Login"])
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -59,6 +61,7 @@ class UserLogoutAPIView(GenericAPIView):
 
     permission_classes = (IsAuthenticated,)
 
+    @extend_schema(tags=["Accounts - Login"])
     def post(self, request, *args, **kwargs):
         try:
             refresh_token = request.data["refresh"]
@@ -68,6 +71,14 @@ class UserLogoutAPIView(GenericAPIView):
         except Exception as e:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         
+@extend_schema_view(
+    list=extend_schema(tags=["Accounts - Users"]),
+    create=extend_schema(tags=["Accounts - Users"]),
+    retrieve=extend_schema(tags=["Accounts - Users"]),
+    update=extend_schema(tags=["Accounts - Users"]),
+    partial_update=extend_schema(tags=["Accounts - Users"]),
+    destroy=extend_schema(tags=["Accounts - Users"]),
+)
 class Userviewset(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
     serializer_class = CustomUserSerializer
@@ -85,6 +96,14 @@ class Userviewset(viewsets.ModelViewSet):
         return User.objects.filter(id=user.id)
 
 
+@extend_schema_view(
+    list=extend_schema(tags=["Accounts - Profile"]),
+    create=extend_schema(tags=["Accounts - Profile"]),
+    retrieve=extend_schema(tags=["Accounts - Profile"]),
+    update=extend_schema(tags=["Accounts - Profile"]),
+    partial_update=extend_schema(tags=["Accounts - Profile"]),
+    destroy=extend_schema(tags=["Accounts - Profile"]),
+)
 class ProfileViewset(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
     serializer_class = ProfileSerializer
@@ -100,6 +119,14 @@ class ProfileViewset(viewsets.ModelViewSet):
         serializer.save(user=self.request.user)
     
 
+@extend_schema_view(
+    list=extend_schema(tags=["Accounts - Address"]),
+    create=extend_schema(tags=["Accounts - Address"]),
+    retrieve=extend_schema(tags=["Accounts - Address"]),
+    update=extend_schema(tags=["Accounts - Address"]),
+    partial_update=extend_schema(tags=["Accounts - Address"]),
+    destroy=extend_schema(tags=["Accounts - Address"]),
+)
 class AddressViewset(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
     serializer_class = AddressSerializer

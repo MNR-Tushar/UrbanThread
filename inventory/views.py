@@ -6,6 +6,7 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.permissions import AllowAny, IsAdminUser
 from django_filters.rest_framework import DjangoFilterBackend
 from django.core.cache import cache
+from drf_spectacular.utils import extend_schema
 
 from .serializers import InventorySerializer
 from .models import Inventory
@@ -30,6 +31,7 @@ INVENTORY_CACHE_TTL     = 60 * 10   # 10 minutes
 AVAILABILITY_CACHE_TTL  = 60 * 5    # 5 minutes
 
 
+@extend_schema(tags=["Inventory - List & Detail"])
 class InventoryViewset(viewsets.ModelViewSet):
     queryset = Inventory.objects.select_related('product', 'color', 'size').all()
     serializer_class = InventorySerializer
@@ -96,6 +98,7 @@ class InventoryViewset(viewsets.ModelViewSet):
 
     # ─── Custom Actions ───────────────────────────────────────────────────────
 
+    @extend_schema(tags=["Inventory - Availability"])
     @action(detail=False, methods=['get'])
     def check_availability(self, request):
         product_id = request.query_params.get('product_id')

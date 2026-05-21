@@ -11,6 +11,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from rest_framework.views import APIView
+from drf_spectacular.utils import extend_schema
 
 import uuid
 import logging
@@ -29,6 +30,7 @@ from accounts.models import Address
 logger = logging.getLogger(__name__)
 
 
+@extend_schema(tags=["Payments - History"])
 class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
     """
     ViewSet for viewing payment history
@@ -58,6 +60,7 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(serializer.data)
 
 
+@extend_schema(tags=["Payments - Initiate"])
 class InitiatePaymentView(APIView):
     """
     Initiate SSL Commerce Payment
@@ -228,6 +231,7 @@ class InitiatePaymentView(APIView):
         return ip
 
 
+@extend_schema(tags=["Payments - Callbacks"])
 class SSLCommerzSuccessView(APIView):
     """Handle SSL Commerce success callback"""
     permission_classes = [AllowAny]
@@ -330,6 +334,7 @@ class SSLCommerzSuccessView(APIView):
         return ip
 
 
+@extend_schema(tags=["Payments - Callbacks"])
 class SSLCommerzFailView(APIView):
     """Handle SSL Commerce fail callback"""
     permission_classes = [AllowAny]
@@ -367,6 +372,7 @@ class SSLCommerzFailView(APIView):
         return redirect(f"{settings.FRONTEND_URL}/payment/failed?transaction_id={tran_id}")
 
 
+@extend_schema(tags=["Payments - Callbacks"])
 class SSLCommerzCancelView(APIView):
     """Handle SSL Commerce cancel callback"""
     permission_classes = [AllowAny]
@@ -403,6 +409,7 @@ class SSLCommerzCancelView(APIView):
         return redirect(f"{settings.FRONTEND_URL}/payment/cancelled?transaction_id={tran_id}")
 
 
+@extend_schema(tags=["Payments - IPN"])
 class SSLCommerzIPNView(APIView):
     """Handle SSL Commerce IPN (Instant Payment Notification)"""
     permission_classes = [AllowAny]
@@ -470,6 +477,7 @@ class SSLCommerzIPNView(APIView):
         return HttpResponse('FAILED')
 
 
+@extend_schema(tags=["Payments - Refunds"])
 class RefundPaymentView(APIView):
     """
     Initiate payment refund (Admin only)

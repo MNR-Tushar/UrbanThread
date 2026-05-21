@@ -7,6 +7,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from django.core.cache import cache
 from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema
 
 # ─── Cache Key Helpers ────────────────────────────────────────────────────────
  
@@ -34,6 +35,7 @@ CATEGORY_CACHE_TTL = 60 * 60   # 1 hour
 BRAND_CACHE_TTL    = 60 * 60   # 1 hour
 SIZE_COLOR_TTL     = 60 * 60 * 6  # 6 hours
 
+@extend_schema(tags=["Products - Categories"])
 class CategoryViewset(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
@@ -76,6 +78,7 @@ class CategoryViewset(viewsets.ModelViewSet):
         self._invalidate_cache()
     
     
+@extend_schema(tags=["Products - Brands"])
 class BrandViewset(viewsets.ModelViewSet):
     queryset = Brand.objects.all()
     serializer_class = BrandSerializer
@@ -118,6 +121,7 @@ class BrandViewset(viewsets.ModelViewSet):
         self._invalidate_cache()
         
         
+@extend_schema(tags=["Products"])
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.select_related('category', 'brand').all()
     permission_classes = [AllowAny]
@@ -184,6 +188,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         instance.delete()
         self._invalidate_product_cache(pk=pk)
     
+@extend_schema(tags=["Products - Images"])
 class ProductImageViewSet(viewsets.ModelViewSet):
     queryset = ProductImage.objects.all()
     serializer_class = ProductImageSerializer
@@ -209,6 +214,7 @@ class ProductImageViewSet(viewsets.ModelViewSet):
         except AttributeError:
             pass
 
+@extend_schema(tags=["Products - Sizes"])
 class SizeViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Size.objects.all()
     serializer_class = SizeSerializer
@@ -226,6 +232,7 @@ class SizeViewSet(viewsets.ReadOnlyModelViewSet):
         
 
 
+@extend_schema(tags=["Products - Colors"])
 class ColorViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Color.objects.all()
     serializer_class = ColorSerializer
