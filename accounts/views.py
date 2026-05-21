@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+import logging
 from rest_framework import status, viewsets
 from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -9,6 +10,7 @@ from .serializers import *
 from .models import Profile, Address
 from .tasks import send_welcome_email
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 class UserRegisterationAPIView(GenericAPIView):
     """

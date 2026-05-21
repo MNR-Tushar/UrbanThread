@@ -51,33 +51,35 @@ class OrderViewSet(viewsets.GenericViewSet):
             return Response({'error': 'Address not found'}, status=status.HTTP_404_NOT_FOUND)
 
         try:
-            cart = Cart.objects.get(user=user)
-        except Cart.DoesNotExist:
-            return Response({'error': 'Cart not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        cart_items = CartItem.objects.filter(cart=cart)
-
-        if not cart_items.exists():
-            return Response({'error': 'Cart is empty'}, status=status.HTTP_400_BAD_REQUEST)
-
-        total_amount = Decimal('0.00')
-        for item in cart_items:
-            price = item.product.discount_price if item.product.discount_price and item.product.discount_price > 0 else item.product.price
-            total_amount += Decimal(price) * item.quantity
-
-        discount = Decimal('0.00')
-        if coupon_code:
-            try:
-                coupon = Coupon.objects.get(code=coupon_code, is_active=True)
-                from datetime import date
-                if coupon.expiration_date >= date.today():
-                    discount = (total_amount * Decimal(coupon.discount)) / 100
-                    total_amount -= discount
-            except Coupon.DoesNotExist:
-                pass
-
-        try:
             with transaction.atomic():
+                try:
+                    cart = Cart.objects.select_for_update().get(user=user)
+                except Cart.DoesNotExist:
+                    return Response({'error': 'Cart not found'}, status=status.HTTP_404_NOT_FOUND)
+
+                cart_items = CartItem.objects.select_for_update().filter(cart=cart).select_related(
+                    'product', 'color', 'size'
+                )
+
+                if not cart_items.exists():
+                    return Response({'error': 'Cart is empty'}, status=status.HTTP_400_BAD_REQUEST)
+
+                total_amount = Decimal('0.00')
+                for item in cart_items:
+                    price = item.product.discount_price if item.product.discount_price and item.product.discount_price > 0 else item.product.price
+                    total_amount += Decimal(price) * item.quantity
+
+                discount = Decimal('0.00')
+                if coupon_code:
+                    try:
+                        coupon = Coupon.objects.get(code=coupon_code, is_active=True)
+                        from datetime import date
+                        if coupon.expiration_date >= date.today():
+                            discount = (total_amount * Decimal(coupon.discount)) / 100
+                            total_amount -= discount
+                    except Coupon.DoesNotExist:
+                        pass
+
                 order_number = f"ORD-{uuid.uuid4().hex[:8].upper()}"
 
                 order = Order.objects.create(
@@ -102,7 +104,7 @@ class OrderViewSet(viewsets.GenericViewSet):
                     )
 
                     try:
-                        inventory = Inventory.objects.get(
+                        inventory = Inventory.objects.select_for_update().get(
                             product=item.product,
                             color=item.color,
                             size=item.size

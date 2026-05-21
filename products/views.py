@@ -44,6 +44,11 @@ class CategoryViewset(viewsets.ModelViewSet):
     search_fields = ['category_name', 'description']
     ordering_fields = ['category_name', 'created_at']
     ordering = ['-created_at']
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAdminUser()]
+        return [AllowAny()]
     
     def list(self, request, *args, **kwargs):
         cache_key = _category_list_key()
@@ -81,6 +86,11 @@ class BrandViewset(viewsets.ModelViewSet):
     search_fields = ['brand_name', 'description']
     ordering_fields = ['brand_name', 'created_at']
     ordering = ['-created_at']
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAdminUser()]
+        return [AllowAny()]
     
     def list(self, request, *args, **kwargs):
         cache_key = _brand_list_key()

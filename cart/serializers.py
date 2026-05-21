@@ -4,6 +4,22 @@ from products.serializers import ProductListSerializer, ColorSerializer, SizeSer
 from inventory.models import Inventory
 
 
+class CartAddItemRequestSerializer(serializers.Serializer):
+    product_id = serializers.IntegerField()
+    color_id = serializers.IntegerField()
+    size_id = serializers.IntegerField()
+    quantity = serializers.IntegerField(min_value=1, default=1)
+
+
+class CartUpdateItemRequestSerializer(serializers.Serializer):
+    item_id = serializers.IntegerField()
+    quantity = serializers.IntegerField(min_value=1)
+
+
+class CartRemoveItemRequestSerializer(serializers.Serializer):
+    item_id = serializers.IntegerField()
+
+
 class CartItemSerializer(serializers.ModelSerializer):
     product = ProductListSerializer(read_only=True)
     color = ColorSerializer(read_only=True)
