@@ -21,7 +21,9 @@ from .serializers import (
     PaymentCallbackSerializer, RefundPaymentSerializer
 )
 from .utils import SSLCommerzPayment
+from .tasks import retry_payment_verification
 from orders.models import Order
+from orders.tasks import push_order_analytics_event
 from accounts.models import Address
 
 logger = logging.getLogger(__name__)
@@ -305,6 +307,7 @@ class SSLCommerzSuccessView(APIView):
                     payment.order.payment_status = 'paid'
                     payment.order.order_status = 'processing'
                     payment.order.save()
+                    transaction.on_commit(lambda: push_order_analytics_event.delay(payment.order.id, "payment_completed"))
                 
                 return redirect(
                     f"{settings.FRONTEND_URL}/payment/success?order_id={payment.order.id}&transaction_id={tran_id}"
@@ -314,6 +317,7 @@ class SSLCommerzSuccessView(APIView):
         payment.status = 'failed'
         payment.error_message = 'Payment validation failed'
         payment.save()
+        retry_payment_verification.delay(payment.id)
         
         return redirect(f"{settings.FRONTEND_URL}/payment/failed?transaction_id={tran_id}")
     
@@ -356,6 +360,7 @@ class SSLCommerzFailView(APIView):
                 event_type='fail_callback',
                 event_data=fail_log_data
             )
+            retry_payment_verification.delay(payment.id)
         except Payment.DoesNotExist:
             logger.error(f"Payment not found for failed transaction: {tran_id}")
         
@@ -391,6 +396,7 @@ class SSLCommerzCancelView(APIView):
                 event_type='cancel_callback',
                 event_data=cancel_log_data
             )
+            retry_payment_verification.delay(payment.id)
         except Payment.DoesNotExist:
             logger.error(f"Payment not found for cancelled transaction: {tran_id}")
         
@@ -456,8 +462,10 @@ class SSLCommerzIPNView(APIView):
                         payment.mark_as_completed()
                         payment.val_id = val_id
                         payment.save()
+                        transaction.on_commit(lambda: push_order_analytics_event.delay(payment.order.id, "payment_completed"))
                 
                 return HttpResponse('SUCCESS')
+            retry_payment_verification.delay(payment.id)
         
         return HttpResponse('FAILED')
 

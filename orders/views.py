@@ -6,6 +6,7 @@ from rest_framework.decorators import action
 from django.db import transaction
 from decimal import Decimal
 import uuid
+import logging
 
 from .serializers import OrderSerializer, OrderCreateSerializer
 from .models import Order, OrderItem
@@ -14,6 +15,14 @@ from inventory.models import Inventory
 from accounts.models import Address
 from payments.models import Payment
 from coupons.models import Coupon
+from .tasks import (
+    generate_sales_report,
+    push_order_analytics_event,
+    send_order_invoice_email,
+    sync_order_stock,
+)
+
+logger = logging.getLogger(__name__)
 
 
 class OrderViewSet(viewsets.GenericViewSet):
@@ -117,6 +126,9 @@ class OrderViewSet(viewsets.GenericViewSet):
                 )
 
                 cart_items.delete()
+                transaction.on_commit(lambda: send_order_invoice_email.delay(order.id))
+                transaction.on_commit(lambda: sync_order_stock.delay(order.id))
+                transaction.on_commit(lambda: push_order_analytics_event.delay(order.id, "order_placed"))
 
                 return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
 
@@ -151,6 +163,7 @@ class OrderViewSet(viewsets.GenericViewSet):
                 # FIX: set to 'cancelled', not True
                 order.order_status = 'cancelled'
                 order.save()
+                transaction.on_commit(lambda: push_order_analytics_event.delay(order.id, "order_cancelled"))
 
             return Response({'message': 'Order cancelled successfully'})
 
@@ -162,3 +175,17 @@ class OrderViewSet(viewsets.GenericViewSet):
         orders = self.get_queryset()
         serializer = self.get_serializer(orders, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['post'])
+    def export_sales_report(self, request):
+        if not request.user.is_staff:
+            return Response({'error': 'Only admins can export reports'}, status=status.HTTP_403_FORBIDDEN)
+
+        start_date = request.data.get('start_date', '')
+        end_date = request.data.get('end_date', '')
+        fmt = request.data.get('format', 'csv')
+        if fmt not in ['csv', 'pdf']:
+            return Response({'error': "format must be 'csv' or 'pdf'"}, status=status.HTTP_400_BAD_REQUEST)
+
+        task = generate_sales_report.delay(start_date=start_date, end_date=end_date, fmt=fmt)
+        return Response({'message': 'Report generation started', 'task_id': task.id}, status=status.HTTP_202_ACCEPTED)

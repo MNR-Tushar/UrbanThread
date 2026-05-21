@@ -23,6 +23,10 @@ app.conf.beat_schedule = {
         "task": "coupons.tasks.deactivate_expired_coupons",
         "schedule": crontab(hour=0, minute=0),      # 00:00 asia/dhaka daily
     },
+    "activate-scheduled-campaigns": {
+        "task": "coupons.tasks.activate_scheduled_campaigns",
+        "schedule": crontab(hour=0, minute=10),
+    },
 
     # ── Orders ────────────────────────────────────────────────────────────────
     # Send a daily summary email to admins (orders placed yesterday)
@@ -41,15 +45,23 @@ app.conf.beat_schedule = {
     # ── Inventory ─────────────────────────────────────────────────────────────
     # Alert admins about low-stock variants — runs every morning
     "low-stock-alert": {
-        "task": "orders.tasks.send_low_stock_alert",
+        "task": "inventory.tasks.send_low_stock_alert",
         "schedule": crontab(hour=7, minute=0),       # 07:00 asia/dhaka daily
+    },
+    "restock-notification": {
+        "task": "inventory.tasks.send_restock_notifications",
+        "schedule": crontab(hour=7, minute=30),
     },
 
     # ── Cart ──────────────────────────────────────────────────────────────────
     # Remind users who left items in cart > 24 h without ordering
     "abandoned-cart-reminder": {
-        "task": "orders.tasks.send_abandoned_cart_reminders",
+        "task": "cart.tasks.send_abandoned_cart_reminders",
         "schedule": crontab(hour=10, minute=0),      # 10:00 asia/dhaka daily
+    },
+    "reprocess-failed-payments": {
+        "task": "payments.tasks.reprocess_failed_callbacks",
+        "schedule": crontab(minute="*/30"),
     },
 }
 

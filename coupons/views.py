@@ -100,6 +100,11 @@ class CouponViewset(viewsets.ModelViewSet):
         try:
             coupon = Coupon.objects.get(code=code, is_active=True)
 
+            if coupon.start_date and coupon.start_date > date.today():
+                data = {'valid': False, 'error': 'Coupon campaign has not started yet'}
+                cache.set(cache_key, data, timeout=VALIDATE_CACHE_TTL)
+                return Response({'error': 'Coupon campaign has not started yet'}, status=status.HTTP_400_BAD_REQUEST)
+
             if coupon.expiration_date < date.today():
                 data = {'valid': False, 'error': 'Coupon has expired'}
                 cache.set(cache_key, data, timeout=VALIDATE_CACHE_TTL)
