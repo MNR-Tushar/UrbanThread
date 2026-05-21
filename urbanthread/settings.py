@@ -26,6 +26,8 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'django_filters',
+    'django_celery_beat',
+    'django_celery_results',
     'drf_yasg',
     'corsheaders',
     'accounts',
@@ -109,13 +111,25 @@ CACHES = {
 SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
 SESSION_CACHE_ALIAS = 'default'
 
-# Celery Configuration (Redis as broker)
-CELERY_BROKER_URL = REDIS_URL
-CELERY_RESULT_BACKEND = REDIS_URL
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = 'UTC'
+# ── Celery ────────────────────────────────────────────────────────────────────
+CELERY_BROKER_URL = config("REDIS_URL", default="redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = config("REDIS_URL", default="redis://localhost:6379/0")
+ 
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = "Asia/Dhaka"
+ 
+# Store task results so Flower can display them
+CELERY_TASK_TRACK_STARTED = True
+CELERY_RESULT_EXTENDED = True
+ 
+# Retry policy defaults — individual tasks can override
+CELERY_TASK_ACKS_LATE = True                  # ack only after task succeeds
+CELERY_TASK_REJECT_ON_WORKER_LOST = True
+ 
+# Beat scheduler — stores schedule in the database (survives restarts)
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
@@ -144,7 +158,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Dhaka'
 
 USE_I18N = True
 

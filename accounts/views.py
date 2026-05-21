@@ -1,13 +1,13 @@
 from django.contrib.auth import get_user_model
-from rest_framework import status
+from rest_framework import status, viewsets
 from rest_framework.generics import GenericAPIView
-from rest_framework import viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .serializers import *
-
+from .models import Profile, Address
+from .tasks import send_welcome_email
 User = get_user_model()
 
 class UserRegisterationAPIView(GenericAPIView):
@@ -22,6 +22,10 @@ class UserRegisterationAPIView(GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+        try:
+            send_welcome_email.delay(user.pk)
+        except Exception as e:
+            logger.error("Failed to send welcome email for user %s: %s", user.pk, e)    
         token = RefreshToken.for_user(user)
         data = serializer.data
         data["tokens"] = {"refresh": str(token), "access": str(token.access_token)}

@@ -1,49 +1,10 @@
-version: "3.9"
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Urban Thread — Docker Compose
-
-# ──────────────────────────────────────────────────────────────────────────────
-
-x-django-env: &django-env
-
-  SECRET_KEY: ${SECRET_KEY}
-  DEBUG: ${DEBUG}
-  ALLOWED_HOSTS: ${ALLOWED_HOSTS}
-  FRONTEND_URL: ${FRONTEND_URL}
-  # Database settings
-  DB_ENGINE: ${DB_ENGINE}
-  DB_NAME: ${DB_NAME}
-  DB_USER: ${DB_USER}
-  DB_PASSWORD: ${DB_PASSWORD}
-  DB_HOST: db
-  DB_PORT: ${DB_PORT}
-
-  # Redis settings
-  REDIS_URL: ${REDIS_URL}
-
-  # SSL Commerce settings
-  SSLCOMMERZ_STORE_ID: ${SSLCOMMERZ_STORE_ID}
-  SSLCOMMERZ_STORE_PASSWORD: ${SSLCOMMERZ_STORE_PASSWORD}
-  SSLCOMMERZ_IS_SANDBOX: ${SSLCOMMERZ_IS_SANDBOX}
-
-  # Email settings
-  
-  EMAIL_BACKEND: ${EMAIL_BACKEND}
-  EMAIL_HOST: ${EMAIL_HOST}
-  EMAIL_PORT: ${EMAIL_PORT}
-  EMAIL_USE_TLS: ${EMAIL_USE_TLS}
-  EMAIL_HOST_USER: ${EMAIL_HOST_USER}
-  EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
-  DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL}
-
 services:
-
-  # ── PostgreSQL ──────────────────────────────────────────────────────────────
   db:
     image: postgres:16-alpine
     container_name: urbanthread_db
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
@@ -58,14 +19,13 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Redis ───────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
     container_name: urbanthread_redis
     restart: unless-stopped
     command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -76,7 +36,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Django Web App ──────────────────────────────────────────────────────────
   web:
     build:
       context: .
@@ -87,7 +46,8 @@ services:
     env_file:
       - .env
     environment:
-      <<: *django-env
+      DB_HOST: db
+      REDIS_URL: redis://redis:6379/0
     ports:
       - "8000:8000"
     volumes:
@@ -100,18 +60,15 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command:
-      - sh
-      - -c
-      - |
-        python manage.py migrate --noinput &&
-        python manage.py collectstatic --noinput &&
-        python -m gunicorn urbanthread.wsgi:application \
-          --bind 0.0.0.0:8000 \
-          --workers 4 \
-          --timeout 120 \
-          --access-logfile - \
-          --error-logfile -
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+      python manage.py collectstatic --noinput &&
+      gunicorn urbanthread.wsgi:application
+      --bind 0.0.0.0:8000
+      --workers 4
+      --timeout 120
+      --access-logfile -
+      --error-logfile -"
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/admin/')\" || exit 1"]
       interval: 30s
@@ -119,40 +76,81 @@ services:
       retries: 3
       start_period: 40s
 
-  # ── Celery Worker (optional) ────────────────────────────────────────────────
-  # celery:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #     target: runtime
-  #   container_name: urbanthread_celery
-  #   restart: unless-stopped
-  #   env_file:
-  #     - .env
-  #   environment:
-  #     <<: *django-env
-  #   command:
-  #     - sh
-  #     - -c
-  #     - python -m celery -A urbanthread worker --loglevel=info
-  #   volumes:
-  #     - media_files:/app/media
-  #   networks:
-  #     - backend
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
+  celery:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: urbanthread_celery
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db
+      REDIS_URL: redis://redis:6379/0
+    command: celery -A urbanthread worker --loglevel=info
+    volumes:
+      - media_files:/app/media
+    networks:
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
-# ── Named Volumes ──────────────────────────────────────────────────────────────
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: urbanthread_celery_beat
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db
+      REDIS_URL: redis://redis:6379/0
+    command: celery -A urbanthread beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    volumes:
+      - media_files:/app/media
+    networks:
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: urbanthread_flower
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db
+      REDIS_URL: redis://redis:6379/0
+    command: celery -A urbanthread flower --port=5555
+    ports:
+      - "5555:5555"
+    networks:
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   redis_data:
   static_files:
   media_files:
 
-# ── Networks ───────────────────────────────────────────────────────────────────
 networks:
   backend:
     driver: bridge
