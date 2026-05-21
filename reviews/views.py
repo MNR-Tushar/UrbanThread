@@ -1,6 +1,7 @@
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.core.cache import cache
+from rest_framework.permissions import BasePermission
 
 from .models import Review
 from .serializers import ReviewSerializer
@@ -26,6 +27,8 @@ class ReviewViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
             return [AllowAny()]
+        if self.action in ['update', 'partial_update', 'destroy']:
+            return [IsAuthenticated(), IsOwnerOrAdmin()]
         return [IsAuthenticated()]
 
     def get_queryset(self):
@@ -90,3 +93,12 @@ class ReviewViewSet(viewsets.ModelViewSet):
 def Response_from_cache(data):
     from rest_framework.response import Response
     return Response(data)
+
+
+class IsOwnerOrAdmin(BasePermission):
+    """
+    Only the review owner or admin can modify/delete the review.
+    """
+
+    def has_object_permission(self, request, view, obj):
+        return request.user.is_staff or obj.user_id == request.user.id

@@ -188,6 +188,56 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
+# drf-spectacular (OpenAPI/Swagger) configuration
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'UrbanThread API',
+    'DESCRIPTION': 'Comprehensive API documentation for UrbanThread e-commerce services.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SCHEMA_PATH_PREFIX': r'/api/v1',
+    'SORT_OPERATIONS': True,
+    'SORT_OPERATION_PARAMETERS': True,
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'displayRequestDuration': True,
+        'persistAuthorization': True,
+        'filter': True,
+        'tryItOutEnabled': True,
+        'docExpansion': 'none',
+    },
+    'COMPONENT_SPLIT_REQUEST': True,
+    'COMPONENT_NO_READ_ONLY_REQUIRED': True,
+    'SECURITY': [{'BearerAuth': []}],
+    'SECURITY_SCHEMES': {
+        'BearerAuth': {
+            'type': 'http',
+            'scheme': 'bearer',
+            'bearerFormat': 'JWT',
+        }
+    },
+    'TAGS': [
+        {'name': 'Accounts - Register', 'description': 'User registration endpoints.'},
+        {'name': 'Accounts - Login', 'description': 'Authentication and logout endpoints.'},
+        {'name': 'Accounts - Users', 'description': 'User management endpoints.'},
+        {'name': 'Accounts - Profile', 'description': 'Profile management endpoints.'},
+        {'name': 'Accounts - Address', 'description': 'Address management endpoints.'},
+        {'name': 'Products', 'description': 'Product listing and detail endpoints.'},
+        {'name': 'Products - Categories', 'description': 'Category management endpoints.'},
+        {'name': 'Products - Brands', 'description': 'Brand management endpoints.'},
+        {'name': 'Products - Images', 'description': 'Product image endpoints.'},
+        {'name': 'Products - Sizes', 'description': 'Available sizes endpoints.'},
+        {'name': 'Products - Colors', 'description': 'Available colors endpoints.'},
+        {'name': 'Inventory - List & Detail', 'description': 'Inventory read/write endpoints.'},
+        {'name': 'Inventory - Availability', 'description': 'Stock availability lookup endpoints.'},
+        {'name': 'Coupons', 'description': 'Coupon validation and management endpoints.'},
+        {'name': 'Payments - History', 'description': 'Payment history endpoints.'},
+        {'name': 'Payments - Initiate', 'description': 'Payment initiation endpoints.'},
+        {'name': 'Payments - Callbacks', 'description': 'Payment gateway callback endpoints.'},
+        {'name': 'Payments - IPN', 'description': 'IPN update endpoints.'},
+        {'name': 'Payments - Refunds', 'description': 'Admin refund endpoints.'},
+    ],
+}
+
 
 # JWT Configuration (Fixed - Using standard tokens, not sliding)
 SIMPLE_JWT = {

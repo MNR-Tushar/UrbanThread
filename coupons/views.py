@@ -32,8 +32,10 @@ class CouponViewset(viewsets.ModelViewSet):
     serializer_class = CouponSerializer
 
     def get_permissions(self):
-        if self.action in ['validate_coupon', 'list', 'retrieve']:
+        if self.action in ['validate_coupon']:
             return [IsAuthenticated()]
+        if self.action in ['list', 'retrieve', 'create', 'update', 'partial_update', 'destroy']:
+            return [IsAdminUser()]
         return [IsAdminUser()]
 
     # ─── List ─────────────────────────────────────────────────────────────────
