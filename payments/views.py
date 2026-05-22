@@ -67,6 +67,11 @@ class InitiatePaymentView(APIView):
     """
     permission_classes = [IsAuthenticated]
     
+    @extend_schema(
+        request=InitiatePaymentSerializer,
+        responses={200: dict, 400: dict, 404: dict},
+        description="Initiate payment for an existing order using SSLCommerz or Cash on Delivery."
+    )
     def post(self, request):
         serializer = InitiatePaymentSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)

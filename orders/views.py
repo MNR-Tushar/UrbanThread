@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
+from drf_spectacular.utils import extend_schema
 
 from django.db import transaction
 from decimal import Decimal
@@ -35,6 +36,11 @@ class OrderViewSet(viewsets.GenericViewSet):
         return Order.objects.filter(user=user).order_by('-created_at')
 
     @action(detail=False, methods=['post'])
+    @extend_schema(
+        request=OrderCreateSerializer,
+        responses={201: OrderSerializer},
+        description="Create an order from the authenticated user's cart."
+    )
     def create_order(self, request):
         serializer = OrderCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
