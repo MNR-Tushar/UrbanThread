@@ -16,7 +16,7 @@ from .serializers import (
     CartRemoveItemRequestSerializer,
 )
 from products.models import Product, Color, Size
-
+from drf_spectacular.utils import extend_schema_view, extend_schema
 
 # ─── Cache Key Helpers ────────────────────────────────────────────────────────
 
@@ -26,7 +26,13 @@ def _cart_key(user_id) -> str:
 
 CART_CACHE_TTL = 60 * 5  # 5 minutes
 
-
+@extend_schema_view(
+    my_cart=extend_schema(tags=['Cart']),
+    add_item=extend_schema(tags=['Cart']),
+    update_item=extend_schema(tags=['Cart']),
+    remove_item=extend_schema(tags=['Cart']),
+    clear_cart=extend_schema(tags=['Cart']),
+)
 class CartViewSet(viewsets.GenericViewSet):
     serializer_class = CartSerializer
     permission_classes = [IsAuthenticated]

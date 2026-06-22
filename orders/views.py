@@ -2,8 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
-from drf_spectacular.utils import extend_schema
-
+from drf_spectacular.utils import extend_schema_view, extend_schema
 from django.db import transaction
 from decimal import Decimal
 import uuid
@@ -25,7 +24,12 @@ from .tasks import (
 
 logger = logging.getLogger(__name__)
 
-
+@extend_schema_view(
+    create_order=extend_schema(tags=['Orders']),
+    cancel_order=extend_schema(tags=['Orders']),
+    order_history=extend_schema(tags=['Orders']),
+    export_sales_report=extend_schema(tags=['Orders']),
+)
 class OrderViewSet(viewsets.GenericViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer

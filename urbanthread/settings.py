@@ -208,11 +208,13 @@ SPECTACULAR_SETTINGS = {
     'COMPONENT_SPLIT_REQUEST': True,
     'COMPONENT_NO_READ_ONLY_REQUIRED': True,
     'SECURITY': [{'BearerAuth': []}],
-    'SECURITY_SCHEMES': {
-        'BearerAuth': {
-            'type': 'http',
-            'scheme': 'bearer',
-            'bearerFormat': 'JWT',
+    'APPEND_COMPONENTS': {
+        'securitySchemes': {
+            'BearerAuth': {
+                'type': 'http',
+                'scheme': 'bearer',
+                'bearerFormat': 'JWT',
+            }
         }
     },
     'TAGS': [
@@ -221,15 +223,23 @@ SPECTACULAR_SETTINGS = {
         {'name': 'Accounts - Users', 'description': 'User management endpoints.'},
         {'name': 'Accounts - Profile', 'description': 'Profile management endpoints.'},
         {'name': 'Accounts - Address', 'description': 'Address management endpoints.'},
+        
         {'name': 'Products', 'description': 'Product listing and detail endpoints.'},
         {'name': 'Products - Categories', 'description': 'Category management endpoints.'},
         {'name': 'Products - Brands', 'description': 'Brand management endpoints.'},
         {'name': 'Products - Images', 'description': 'Product image endpoints.'},
         {'name': 'Products - Sizes', 'description': 'Available sizes endpoints.'},
         {'name': 'Products - Colors', 'description': 'Available colors endpoints.'},
+        
         {'name': 'Inventory - List & Detail', 'description': 'Inventory read/write endpoints.'},
         {'name': 'Inventory - Availability', 'description': 'Stock availability lookup endpoints.'},
         {'name': 'Coupons', 'description': 'Coupon validation and management endpoints.'},
+        
+        {'name': 'Cart', 'description': 'Cart management endpoints.'},
+        
+        {'name': 'Orders', 'description': 'Order management endpoints.'},
+        
+        {'name': 'Payments - Gateway', 'description': 'Payment gateway endpoints.'},
         {'name': 'Payments - History', 'description': 'Payment history endpoints.'},
         {'name': 'Payments - Initiate', 'description': 'Payment initiation endpoints.'},
         {'name': 'Payments - Callbacks', 'description': 'Payment gateway callback endpoints.'},
