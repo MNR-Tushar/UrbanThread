@@ -4,7 +4,7 @@ from celery import shared_task
 from django.db import transaction
 
 from payments.models import Payment, PaymentLog
-from payments.utils import SSLCommerzPayment
+from payments.utils import SSLCommerzPayment, validation_matches_payment
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ def retry_payment_verification(payment_id: int) -> str:
         event_data=response if isinstance(response, dict) else {"raw": str(response)},
     )
 
-    if response.get("status") in ["VALID", "VALIDATED"]:
+    if validation_matches_payment(response, payment, payment.transaction_id):
         with transaction.atomic():
             payment.mark_as_completed()
         return f"verified:{payment.transaction_id}"

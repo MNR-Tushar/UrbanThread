@@ -130,8 +130,15 @@ else:
     SESSION_CACHE_ALIAS = 'default'
 
 # ── Celery ────────────────────────────────────────────────────────────────────
-CELERY_BROKER_URL = config("REDIS_URL", default="redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = config("REDIS_URL", default="redis://localhost:6379/0")
+if REDIS_URL == "locmem" or not REDIS_URL.startswith("redis://"):
+    # Local Django cache mode has no Celery backend named "locmem". Use a
+    # process-local broker and disable results until a real broker is configured.
+    CELERY_BROKER_URL = config("CELERY_BROKER_URL", default="memory://")
+    CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", default=None) or None
+    CELERY_TASK_IGNORE_RESULT = True
+else:
+    CELERY_BROKER_URL = config("CELERY_BROKER_URL", default=REDIS_URL)
+    CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", default=REDIS_URL)
  
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"

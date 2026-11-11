@@ -43,7 +43,7 @@ class InventoryViewset(viewsets.ModelViewSet):
     ordering = ['-created_at']
 
     def get_permissions(self):
-        if self.action in ['list', 'retrieve', 'check_availability', 'product_inventory']:
+        if self.action in ['check_availability', 'product_inventory']:
             return [AllowAny()]
         return [IsAdminUser()]
 
