@@ -9,7 +9,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ─── Security ─────────────────────────────────────────────────────────────────
 
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-s&$9k=^wje4etnj+k1v(a98o80ivik#vxyov+u%v!(h$k8uv*t')
-DEBUG = config('DEBUG', default=True, cast=bool)
+DEBUG_VALUE = str(config('DEBUG', default='True')).strip().lower()
+DEBUG = DEBUG_VALUE in {'1', 'true', 'yes', 'on'}
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=lambda v: [s.strip() for s in v.split(',')])
 
 
@@ -148,8 +149,8 @@ CELERY_TASK_REJECT_ON_WORKER_LOST = True
 # Beat scheduler — stores schedule in the database (survives restarts)
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
-CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOW_CREDENTIALS = False
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -310,6 +311,7 @@ SSLCOMMERZ_IS_SANDBOX = config('SSLCOMMERZ_IS_SANDBOX', default=True, cast=bool)
 
 # Frontend URL for payment redirects
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
+BACKEND_PUBLIC_URL = config('BACKEND_PUBLIC_URL', default='')
 
 # Email Configuration
 EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')

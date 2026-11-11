@@ -225,3 +225,20 @@ class SSLCommerzPayment:
         verify_sign_key = hashlib.md5(verify_key.encode()).hexdigest()
         
         return verify_sign == verify_sign_key
+
+
+def validation_matches_payment(response: Dict, payment, tran_id: Optional[str] = None) -> bool:
+    """Accept only a validated transaction that matches our order amount and currency."""
+    if not isinstance(response, dict) or response.get('status') not in {'VALID', 'VALIDATED'}:
+        return False
+    response_tran_id = response.get('tran_id')
+    if not response_tran_id or response_tran_id != payment.transaction_id:
+        return False
+    if tran_id and response_tran_id != tran_id:
+        return False
+    try:
+        response_amount = Decimal(str(response.get('amount')))
+    except Exception:
+        return False
+    response_currency = response.get('currency_type') or response.get('currency')
+    return response_amount == payment.amount and response_currency == payment.currency

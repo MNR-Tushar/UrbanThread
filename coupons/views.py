@@ -1,6 +1,6 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from rest_framework.response import Response
 from django.core.cache import cache
 from datetime import date
@@ -12,11 +12,11 @@ from .models import Coupon
 
 # ─── Cache Key Helpers ────────────────────────────────────────────────────────
 
-def _coupon_list_key() -> str:
-    return "coupon_list"
+def _coupon_list_key(is_staff=False) -> str:
+    return f"coupon_list:{'staff' if is_staff else 'public'}"
 
-def _coupon_detail_key(pk) -> str:
-    return f"coupon_detail:{pk}"
+def _coupon_detail_key(pk, is_staff=False) -> str:
+    return f"coupon_detail:{'staff' if is_staff else 'public'}:{pk}"
 
 def _coupon_validate_key(code: str) -> str:
     return f"coupon_valid:{code}"
@@ -34,14 +34,22 @@ class CouponViewset(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ['validate_coupon']:
             return [IsAuthenticated()]
+        if self.action in ['list', 'retrieve']:
+            return [AllowAny()]
         if self.action in ['list', 'retrieve', 'create', 'update', 'partial_update', 'destroy']:
             return [IsAdminUser()]
         return [IsAdminUser()]
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if not self.request.user.is_staff:
+            return queryset.filter(is_active=True)
+        return queryset
+
     # ─── List ─────────────────────────────────────────────────────────────────
 
     def list(self, request, *args, **kwargs):
-        cache_key = _coupon_list_key()
+        cache_key = _coupon_list_key(request.user.is_staff)
         cached = cache.get(cache_key)
         if cached is not None:
             return Response(cached)
@@ -53,7 +61,7 @@ class CouponViewset(viewsets.ModelViewSet):
     # ─── Retrieve ─────────────────────────────────────────────────────────────
 
     def retrieve(self, request, *args, **kwargs):
-        cache_key = _coupon_detail_key(kwargs.get('pk'))
+        cache_key = _coupon_detail_key(kwargs.get('pk'), request.user.is_staff)
         cached = cache.get(cache_key)
         if cached is not None:
             return Response(cached)
@@ -66,8 +74,10 @@ class CouponViewset(viewsets.ModelViewSet):
 
     def _invalidate_coupon_cache(self, pk=None, code=None):
         cache.delete(_coupon_list_key())
+        cache.delete(_coupon_list_key(is_staff=True))
         if pk:
             cache.delete(_coupon_detail_key(pk))
+            cache.delete(_coupon_detail_key(pk, is_staff=True))
         if code:
             cache.delete(_coupon_validate_key(code))
 

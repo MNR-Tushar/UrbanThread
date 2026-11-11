@@ -1,5 +1,6 @@
 from django.shortcuts import redirect
 from django.conf import settings
+from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -21,13 +22,21 @@ from .serializers import (
     PaymentSerializer, PaymentLogSerializer, InitiatePaymentSerializer,
     PaymentCallbackSerializer, RefundPaymentSerializer
 )
-from .utils import SSLCommerzPayment
+from .utils import SSLCommerzPayment, validation_matches_payment
 from .tasks import retry_payment_verification
 from orders.models import Order
 from orders.tasks import push_order_analytics_event
 from accounts.models import Address
 
 logger = logging.getLogger(__name__)
+
+
+def _enqueue_payment_task(task, *args):
+    """Do not break a payment callback when the optional Celery broker is offline."""
+    try:
+        task.delay(*args)
+    except Exception:
+        logger.exception("Could not queue payment background task %s", task.name)
 
 
 @extend_schema(tags=["Payments - History"])
@@ -130,6 +139,12 @@ class InitiatePaymentView(APIView):
         
         # Handle SSL Commerce Payment
         if payment_method == 'sslcommerz':
+            if not Decimal('10.00') <= order.total_amount <= Decimal('500000.00'):
+                return Response(
+                    {'error': 'SSLCommerz accepts BDT payments from ৳10.00 to ৳500,000.00.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
             # Create unique transaction ID
             transaction_id = f"TXN-{uuid.uuid4().hex[:12].upper()}"
             
@@ -152,10 +167,11 @@ class InitiatePaymentView(APIView):
                 payment.save()
             
             # Prepare payment data for SSL Commerce
-            base_url = request.build_absolute_uri('/')[:-1]
+            public_backend_url = getattr(settings, 'BACKEND_PUBLIC_URL', '').rstrip('/')
+            base_url = public_backend_url or request.build_absolute_uri('/').rstrip('/')
             
             payment_data = {
-                'total_amount': float(order.total_amount),
+                'total_amount': format(order.total_amount, '.2f'),
                 'currency': 'BDT',
                 'tran_id': transaction_id,
                 'success_url': f"{base_url}/payments/sslcommerz/success/",
@@ -200,7 +216,7 @@ class InitiatePaymentView(APIView):
                 user_agent=request.META.get('HTTP_USER_AGENT', '')
             )
             
-            if response.get('status') == 'SUCCESS':
+            if response.get('status') == 'SUCCESS' and response.get('GatewayPageURL'):
                 payment.status = 'processing'
                 payment.response_data = response
                 payment.save()
@@ -213,12 +229,12 @@ class InitiatePaymentView(APIView):
                 })
             else:
                 payment.status = 'failed'
-                payment.error_message = response.get('message', 'Payment initiation failed')
+                payment.error_message = response.get('failedreason') or response.get('message') or 'Payment session was not returned by SSLCommerz.'
                 payment.save()
                 
                 return Response({
                     'success': False,
-                    'error': response.get('message', 'Payment initiation failed')
+                    'error': payment.error_message
                 }, status=status.HTTP_400_BAD_REQUEST)
         
         return Response(
@@ -258,6 +274,9 @@ class SSLCommerzSuccessView(APIView):
         except Payment.DoesNotExist:
             logger.error(f"Payment not found for transaction: {tran_id}")
             return redirect(f"{settings.FRONTEND_URL}/payment/failed")
+
+        if payment.status == 'completed':
+            return redirect(f"{settings.FRONTEND_URL}/payment/success?order_id={payment.order.id}&transaction_id={tran_id}")
         
         # Log the callback
         callback_log_data = serializer.validated_data.copy() if isinstance(serializer.validated_data, dict) else {}
@@ -295,10 +314,9 @@ class SSLCommerzSuccessView(APIView):
                 event_data=validation_log_data
             )
             
-            if validation_response.get('status') == 'VALID' or validation_response.get('status') == 'VALIDATED':
+            if validation_matches_payment(validation_response, payment, tran_id):
                 with transaction.atomic():
-                    # Update payment
-                    payment.status = 'completed'
+                    payment.mark_as_completed()
                     payment.val_id = val_id
                     payment.card_type = serializer.validated_data.get('card_type', '')
                     payment.card_no = serializer.validated_data.get('card_no', '')
@@ -308,15 +326,9 @@ class SSLCommerzSuccessView(APIView):
                     payment.card_issuer_country = serializer.validated_data.get('card_issuer_country', '')
                     payment.risk_level = serializer.validated_data.get('risk_level', '')
                     payment.risk_title = serializer.validated_data.get('risk_title', '')
-                    payment.completed_at = timezone.now()
                     payment.response_data = validation_response
                     payment.save()
-                    
-                    # Update order
-                    payment.order.payment_status = 'paid'
-                    payment.order.order_status = 'processing'
-                    payment.order.save()
-                    transaction.on_commit(lambda: push_order_analytics_event.delay(payment.order.id, "payment_completed"))
+                    transaction.on_commit(lambda: _enqueue_payment_task(push_order_analytics_event, payment.order.id, "payment_completed"))
                 
                 return redirect(
                     f"{settings.FRONTEND_URL}/payment/success?order_id={payment.order.id}&transaction_id={tran_id}"
@@ -324,9 +336,9 @@ class SSLCommerzSuccessView(APIView):
         
         # If validation failed
         payment.status = 'failed'
-        payment.error_message = 'Payment validation failed'
+        payment.error_message = 'Payment validation failed or the amount/currency did not match the order.'
         payment.save()
-        retry_payment_verification.delay(payment.id)
+        _enqueue_payment_task(retry_payment_verification, payment.id)
         
         return redirect(f"{settings.FRONTEND_URL}/payment/failed?transaction_id={tran_id}")
     
@@ -370,7 +382,7 @@ class SSLCommerzFailView(APIView):
                 event_type='fail_callback',
                 event_data=fail_log_data
             )
-            retry_payment_verification.delay(payment.id)
+            _enqueue_payment_task(retry_payment_verification, payment.id)
         except Payment.DoesNotExist:
             logger.error(f"Payment not found for failed transaction: {tran_id}")
         
@@ -407,7 +419,7 @@ class SSLCommerzCancelView(APIView):
                 event_type='cancel_callback',
                 event_data=cancel_log_data
             )
-            retry_payment_verification.delay(payment.id)
+            _enqueue_payment_task(retry_payment_verification, payment.id)
         except Payment.DoesNotExist:
             logger.error(f"Payment not found for cancelled transaction: {tran_id}")
         
@@ -468,16 +480,16 @@ class SSLCommerzIPNView(APIView):
                 event_data=ipn_validation_log_data
             )
             
-            if validation_response.get('status') in ['VALID', 'VALIDATED']:
+            if validation_matches_payment(validation_response, payment, tran_id):
                 if payment.status != 'completed':
                     with transaction.atomic():
                         payment.mark_as_completed()
                         payment.val_id = val_id
                         payment.save()
-                        transaction.on_commit(lambda: push_order_analytics_event.delay(payment.order.id, "payment_completed"))
+                        transaction.on_commit(lambda: _enqueue_payment_task(push_order_analytics_event, payment.order.id, "payment_completed"))
                 
                 return HttpResponse('SUCCESS')
-            retry_payment_verification.delay(payment.id)
+            _enqueue_payment_task(retry_payment_verification, payment.id)
         
         return HttpResponse('FAILED')
 

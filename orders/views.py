@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from drf_spectacular.utils import extend_schema_view, extend_schema
 from django.db import transaction
+from django.core.cache import cache
 from decimal import Decimal
 import uuid
 import logging
@@ -24,6 +25,14 @@ from .tasks import (
 
 logger = logging.getLogger(__name__)
 
+
+def _enqueue_task(task, *args):
+    """Keep a completed order successful when the optional Celery broker is offline."""
+    try:
+        task.delay(*args)
+    except Exception:
+        logger.exception("Could not queue background task %s", task.name)
+
 @extend_schema_view(
     create_order=extend_schema(tags=['Orders']),
     cancel_order=extend_schema(tags=['Orders']),
@@ -38,6 +47,12 @@ class OrderViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         user = self.request.user
         return Order.objects.filter(user=user).order_by('-created_at')
+
+    def retrieve(self, request, pk=None):
+        order = self.get_queryset().filter(pk=pk).first()
+        if order is None:
+            return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(OrderSerializer(order).data)
 
     @action(detail=False, methods=['post'])
     @extend_schema(
@@ -127,6 +142,8 @@ class OrderViewSet(viewsets.GenericViewSet):
 
                     inventory.quantity -= item.quantity
                     inventory.save()
+                    cache.delete(f"inventory_avail:{item.product_id}:{item.color_id}:{item.size_id}")
+                    cache.delete(f"product_inventory:{item.product_id}")
 
                 Payment.objects.create(
                     user=user,
@@ -138,9 +155,9 @@ class OrderViewSet(viewsets.GenericViewSet):
                 )
 
                 cart_items.delete()
-                transaction.on_commit(lambda: send_order_invoice_email.delay(order.id))
-                transaction.on_commit(lambda: sync_order_stock.delay(order.id))
-                transaction.on_commit(lambda: push_order_analytics_event.delay(order.id, "order_placed"))
+                transaction.on_commit(lambda: _enqueue_task(send_order_invoice_email, order.id))
+                transaction.on_commit(lambda: _enqueue_task(sync_order_stock, order.id))
+                transaction.on_commit(lambda: _enqueue_task(push_order_analytics_event, order.id, "order_placed"))
 
                 return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
 
@@ -169,13 +186,15 @@ class OrderViewSet(viewsets.GenericViewSet):
                         )
                         inventory.quantity += item.quantity
                         inventory.save()
+                        cache.delete(f"inventory_avail:{item.product_id}:{item.color_id}:{item.size_id}")
+                        cache.delete(f"product_inventory:{item.product_id}")
                     except Inventory.DoesNotExist:
                         return Response({'error': 'Inventory not found'}, status=status.HTTP_404_NOT_FOUND)
 
                 # FIX: set to 'cancelled', not True
                 order.order_status = 'cancelled'
                 order.save()
-                transaction.on_commit(lambda: push_order_analytics_event.delay(order.id, "order_cancelled"))
+                transaction.on_commit(lambda: _enqueue_task(push_order_analytics_event, order.id, "order_cancelled"))
 
             return Response({'message': 'Order cancelled successfully'})
 
