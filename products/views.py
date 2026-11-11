@@ -203,7 +203,7 @@ class ProductImageViewSet(viewsets.ModelViewSet):
         try:
             cache.delete_pattern("*product_list:*")
         except AttributeError:
-            pass
+            cache.clear()
  
     def perform_destroy(self, instance):
         pk = instance.productimg_id
@@ -212,7 +212,7 @@ class ProductImageViewSet(viewsets.ModelViewSet):
         try:
             cache.delete_pattern("*product_list:*")
         except AttributeError:
-            pass
+            cache.clear()
 
 @extend_schema(tags=["Products - Sizes"])
 class SizeViewSet(viewsets.ReadOnlyModelViewSet):

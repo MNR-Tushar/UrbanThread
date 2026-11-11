@@ -82,7 +82,7 @@ class InventoryViewset(viewsets.ModelViewSet):
         try:
             cache.delete_pattern("*inventory_list:*")
         except AttributeError:
-            pass
+            cache.clear()
 
     def perform_create(self, serializer):
         instance = serializer.save()

@@ -14,5 +14,5 @@ class InventorySerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Inventory
-        fields = ['product', 'color', 'size', 'quantity', 'product_id', 'color_id', 'size_id', 'created_at', 'updated_at']
+        fields = ['id', 'product', 'color', 'size', 'quantity', 'product_id', 'color_id', 'size_id', 'created_at', 'updated_at']
         read_only_fields = ('created_at', 'updated_at')
