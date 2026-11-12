@@ -124,6 +124,7 @@ class BrandViewset(viewsets.ModelViewSet):
 @extend_schema(tags=["Products"])
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.select_related('category', 'brand').all()
+    lookup_field = 'slug'
     permission_classes = [AllowAny]
     pagination_class = LimitOffsetPagination
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -164,13 +165,16 @@ class ProductViewSet(viewsets.ModelViewSet):
         cache.set(cache_key, response.data, timeout=PRODUCT_CACHE_TTL)
         return response
  
-    def _invalidate_product_cache(self, pk=None):
+    def _invalidate_product_cache(self, pk=None, slug=None):
         # Specific product cache delete
         if pk:
             cache.delete(_product_detail_key(pk))
+        if slug:
+            cache.delete(_product_detail_key(slug))
         # All product list cache delete — pattern delete (django-redis)
         try:
             cache.delete_pattern("*product_list:*")
+            cache.delete_pattern("*product_detail:*")
         except AttributeError:
             # django-redis < 5.0 does not support delete_pattern, fallback to clearing entire cache
             cache.clear()
@@ -181,12 +185,13 @@ class ProductViewSet(viewsets.ModelViewSet):
  
     def perform_update(self, serializer):
         instance = serializer.save()
-        self._invalidate_product_cache(pk=instance.pk)
+        self._invalidate_product_cache(pk=instance.pk, slug=instance.slug)
  
     def perform_destroy(self, instance):
         pk = instance.pk
+        slug = instance.slug
         instance.delete()
-        self._invalidate_product_cache(pk=pk)
+        self._invalidate_product_cache(pk=pk, slug=slug)
     
 @extend_schema(tags=["Products - Images"])
 class ProductImageViewSet(viewsets.ModelViewSet):
@@ -202,6 +207,7 @@ class ProductImageViewSet(viewsets.ModelViewSet):
         cache.delete(_product_detail_key(instance.productimg_id))
         try:
             cache.delete_pattern("*product_list:*")
+            cache.delete_pattern("*product_detail:*")
         except AttributeError:
             cache.clear()
 
@@ -211,6 +217,7 @@ class ProductImageViewSet(viewsets.ModelViewSet):
         cache.delete(_product_detail_key(product_id))
         try:
             cache.delete_pattern("*product_list:*")
+            cache.delete_pattern("*product_detail:*")
         except AttributeError:
             cache.clear()
 
