@@ -90,6 +90,7 @@ class StoreSettings(models.Model):
     help_phone = models.CharField(max_length=30, blank=True)
     social_facebook = models.URLField(blank=True)
     social_instagram = models.URLField(blank=True)
+    social_youtube = models.URLField(blank=True)
     dhaka_delivery_fee = models.DecimalField(max_digits=8, decimal_places=2, default=70)
     outside_delivery_fee = models.DecimalField(max_digits=8, decimal_places=2, default=130)
     updated_at = models.DateTimeField(auto_now=True)

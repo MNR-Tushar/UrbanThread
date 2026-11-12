@@ -1,0 +1,8 @@
+﻿from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+    dependencies = [('products', '0010_storesettings_logo')]
+    operations = [
+        migrations.AddField(model_name='storesettings', name='social_youtube', field=models.URLField(blank=True)),
+    ]
