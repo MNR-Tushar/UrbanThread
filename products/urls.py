@@ -9,6 +9,7 @@ router.register(r'products', ProductViewSet, basename='product')
 router.register(r'product-images', ProductImageViewSet, basename='product-image')
 router.register(r'banners', StoreBannerViewSet, basename='store-banner')
 router.register(r'store-settings', StoreSettingsViewSet, basename='store-settings')
+router.register(r'wishlist', WishlistViewSet, basename='wishlist')
 router.register(r'sizes', SizeViewSet, basename='size')
 router.register(r'colors', ColorViewSet, basename='color')
 

@@ -257,6 +257,22 @@ class StoreSettingsViewSet(viewsets.ModelViewSet):
             serializer.save()
             return Response(serializer.data)
         return super().create(request, *args, **kwargs)
+
+
+@extend_schema(tags=["Wishlist"])
+class WishlistViewSet(viewsets.ModelViewSet):
+    serializer_class = WishlistItemSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'post', 'delete', 'head', 'options']
+
+    def get_queryset(self):
+        return WishlistItem.objects.filter(user=self.request.user).select_related('product', 'product__category', 'product__brand')
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        item, created = WishlistItem.objects.get_or_create(user=request.user, product=serializer.validated_data['product'])
+        return Response(self.get_serializer(item).data, status=201 if created else 200)
  
 @extend_schema(tags=["Products - Sizes"])
 class SizeViewSet(viewsets.ReadOnlyModelViewSet):

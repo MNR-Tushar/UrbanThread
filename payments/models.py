@@ -76,8 +76,12 @@ class Payment(models.Model):
         
         # FIX: order.payment_status is now a CharField ('paid'), not a boolean
         self.order.payment_status = 'paid'
+        previous_status = self.order.order_status
         self.order.order_status = 'processing'
         self.order.save()
+        if previous_status != 'processing':
+            from orders.models import OrderStatusHistory
+            OrderStatusHistory.objects.create(order=self.order, status='processing', note='Payment confirmed; order is being processed.')
     
     def mark_as_failed(self, error_message=None):
         """Mark payment as failed"""

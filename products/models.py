@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 import uuid
 from django.utils.text import slugify
 
@@ -97,6 +98,16 @@ class StoreSettings(models.Model):
 
     def __str__(self):
         return self.store_name
+
+
+class WishlistItem(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='wishlist_items')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='wishlisted_by')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [models.UniqueConstraint(fields=['user', 'product'], name='unique_user_wishlist_product')]
 
 
 class Size(models.Model):

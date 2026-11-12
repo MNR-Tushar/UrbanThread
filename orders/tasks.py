@@ -120,7 +120,13 @@ def send_daily_order_summary() -> str:
 def auto_cancel_stale_orders() -> str:
     threshold = timezone.now() - timedelta(hours=24)
     stale_orders = Order.objects.filter(order_status="pending", created_at__lt=threshold)
-    updated = stale_orders.update(order_status="cancelled")
+    updated = 0
+    for order in stale_orders.iterator():
+        order.order_status = 'cancelled'
+        order.save(update_fields=['order_status', 'updated_at'])
+        from .models import OrderStatusHistory
+        OrderStatusHistory.objects.create(order=order, status='cancelled', note='Automatically cancelled after 24 hours.')
+        updated += 1
     return f"auto_cancelled:{updated}"
 
 

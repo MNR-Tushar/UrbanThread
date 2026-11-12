@@ -13,7 +13,7 @@ import uuid
 import logging
 
 from .serializers import OrderSerializer, OrderCreateSerializer
-from .models import Order, OrderItem
+from .models import Order, OrderItem, OrderStatusHistory
 from cart.models import Cart, CartItem
 from inventory.models import Inventory
 from accounts.models import Address
@@ -94,8 +94,11 @@ class OrderViewSet(viewsets.GenericViewSet):
         allowed = {key for key, _ in Order.ORDER_STATUS_CHOICES}
         if next_status not in allowed:
             return Response({'order_status': ['Choose a valid order status.']}, status=status.HTTP_400_BAD_REQUEST)
+        previous_status = order.order_status
         order.order_status = next_status
         order.save(update_fields=['order_status', 'updated_at'])
+        if previous_status != next_status:
+            OrderStatusHistory.objects.create(order=order, status=next_status, note=f'Status changed from {previous_status} to {next_status}.')
         return Response(OrderSerializer(order).data)
 
     def get_queryset(self):
@@ -180,6 +183,7 @@ class OrderViewSet(viewsets.GenericViewSet):
                         'pincode': address.pincode, 'address': address.address,
                     },
                 )
+                OrderStatusHistory.objects.create(order=order, status='pending', note='Order placed.')
 
                 for item in cart_items:
                     price = item.product.discount_price if item.product.discount_price and item.product.discount_price > 0 else item.product.price
@@ -259,6 +263,7 @@ class OrderViewSet(viewsets.GenericViewSet):
                 # FIX: set to 'cancelled', not True
                 order.order_status = 'cancelled'
                 order.save()
+                OrderStatusHistory.objects.create(order=order, status='cancelled', note='Order cancelled by customer.')
                 transaction.on_commit(lambda: _enqueue_task(push_order_analytics_event, order.id, "order_cancelled"))
 
             return Response({'message': 'Order cancelled successfully'})

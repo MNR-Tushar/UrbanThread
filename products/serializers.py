@@ -33,7 +33,6 @@ class StoreSettingsSerializer(serializers.ModelSerializer):
         model = StoreSettings
         fields = '__all__'
         read_only_fields = ['updated_at']
-        read_only_fields = ('created_at',)
 
 
 class SizeSerializer(serializers.ModelSerializer):
@@ -90,3 +89,13 @@ class ProductDetailSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         return Product.objects.create(**validated_data)
+
+
+class WishlistItemSerializer(serializers.ModelSerializer):
+    product = ProductListSerializer(read_only=True)
+    product_id = serializers.PrimaryKeyRelatedField(source='product', queryset=Product.objects.all(), write_only=True)
+
+    class Meta:
+        model = WishlistItem
+        fields = ['id', 'product', 'product_id', 'created_at']
+        read_only_fields = ['created_at']

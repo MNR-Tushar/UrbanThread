@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Order, OrderItem
+from .models import Order, OrderItem, OrderStatusHistory
 from products.serializers import ProductListSerializer, ColorSerializer, SizeSerializer
 from accounts.serializers import CustomUserSerializer
 
@@ -19,15 +19,24 @@ class OrderItemSerializer(serializers.ModelSerializer):
         return float(obj.price * obj.quantity)
 
 
+class OrderStatusHistorySerializer(serializers.ModelSerializer):
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = OrderStatusHistory
+        fields = ['id', 'status', 'status_display', 'note', 'created_at']
+
+
 class OrderSerializer(serializers.ModelSerializer):
     user = CustomUserSerializer(read_only=True)
     # FIX: related_name on OrderItem FK is now 'items' (set in orders/models.py)
     items = OrderItemSerializer(many=True, read_only=True)
+    status_history = OrderStatusHistorySerializer(many=True, read_only=True)
 
     class Meta:
         model = Order
         fields = ['id', 'order_number', 'user', 'total_amount', 'shipping_fee', 'payment_status',
-                  'order_status', 'shipping_address', 'items', 'created_at', 'updated_at']
+                  'order_status', 'shipping_address', 'status_history', 'items', 'created_at', 'updated_at']
         read_only_fields = ['order_number', 'user', 'created_at', 'updated_at']
 
 
