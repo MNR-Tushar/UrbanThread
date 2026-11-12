@@ -20,6 +20,19 @@ class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductImage
         fields = '__all__'
+
+
+class StoreBannerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StoreBanner
+        fields = '__all__'
+
+
+class StoreSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StoreSettings
+        fields = '__all__'
+        read_only_fields = ['updated_at']
         read_only_fields = ('created_at',)
 
 
@@ -70,7 +83,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Product
-        fields = ['id', 'product_name', 'description', 'price', 'discount_price',
+        fields = ['id', 'product_name', 'sku', 'description', 'price', 'discount_price',
                   'is_available', 'slug', 'created_at', 'category', 'brand',
                   'images', 'category_id', 'brand_id','updated_at']
         read_only_fields = ['slug', 'created_at']

@@ -4,6 +4,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from drf_spectacular.utils import extend_schema_view, extend_schema
 from django.db import transaction
+from django.db.models import Sum, Count
+from django.utils import timezone
+from datetime import timedelta
 from django.core.cache import cache
 from decimal import Decimal
 import uuid
@@ -16,6 +19,7 @@ from inventory.models import Inventory
 from accounts.models import Address
 from payments.models import Payment
 from coupons.models import Coupon
+from products.models import StoreSettings
 from .tasks import (
     generate_sales_report,
     push_order_analytics_event,
@@ -43,6 +47,56 @@ class OrderViewSet(viewsets.GenericViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def admin_dashboard(self, request):
+        if not request.user.is_staff and not request.user.is_superuser:
+            return Response({'detail': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
+        from accounts.models import CustomUser
+        from inventory.models import Inventory
+        from django.db.models.functions import TruncDate, TruncWeek, TruncMonth
+        today = timezone.localdate()
+        period = request.query_params.get('period', 'daily')
+        truncator, span = {'weekly': (TruncWeek, 84), 'monthly': (TruncMonth, 365)}.get(period, (TruncDate, 6))
+        recent_days = today - timedelta(days=span)
+        orders = Order.objects.select_related('user').prefetch_related('items__product').order_by('-created_at')
+        daily = (Order.objects.filter(created_at__date__gte=recent_days, created_at__date__lte=today)
+                 .exclude(order_status='cancelled').annotate(day=truncator('created_at'))
+                 .values('day').annotate(sales=Sum('total_amount'), orders=Count('id')).order_by('day'))
+        return Response({
+            'today_sales': Order.objects.filter(created_at__date=today).exclude(order_status='cancelled').aggregate(total=Sum('total_amount'))['total'] or 0,
+            'total_orders': Order.objects.count(),
+            'pending_orders': Order.objects.filter(order_status='pending').count(),
+            'customers': CustomUser.objects.filter(is_staff=False, is_superuser=False).count(),
+            'daily_sales': list(daily),
+            'low_stock': list(Inventory.objects.filter(quantity__lte=5).select_related('product', 'color', 'size').values('id', 'quantity', 'product__product_name', 'color__color', 'size__size_type')[:12]),
+            'recent_orders': OrderSerializer(orders[:8], many=True).data,
+        })
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def admin_orders(self, request):
+        if not request.user.is_staff and not request.user.is_superuser:
+            return Response({'detail': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
+        orders = Order.objects.select_related('user').prefetch_related('items__product').order_by('-created_at')
+        selected_status = request.query_params.get('status')
+        if selected_status:
+            orders = orders.filter(order_status=selected_status)
+        return Response(OrderSerializer(orders, many=True).data)
+
+    @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
+    def admin_update_status(self, request, pk=None):
+        if not request.user.is_staff and not request.user.is_superuser:
+            return Response({'detail': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
+        order = Order.objects.filter(pk=pk).first()
+        if not order:
+            return Response({'detail': 'Order not found.'}, status=status.HTTP_404_NOT_FOUND)
+        next_status = request.data.get('order_status')
+        allowed = {key for key, _ in Order.ORDER_STATUS_CHOICES}
+        if next_status not in allowed:
+            return Response({'order_status': ['Choose a valid order status.']}, status=status.HTTP_400_BAD_REQUEST)
+        order.order_status = next_status
+        order.save(update_fields=['order_status', 'updated_at'])
+        return Response(OrderSerializer(order).data)
 
     def get_queryset(self):
         user = self.request.user
@@ -105,15 +159,26 @@ class OrderViewSet(viewsets.GenericViewSet):
                     except Coupon.DoesNotExist:
                         pass
 
+                settings_row = StoreSettings.objects.order_by('id').first()
+                city = (address.city or '').strip().lower()
+                shipping_fee = (settings_row.dhaka_delivery_fee if settings_row else Decimal('70.00')) if city in ('dhaka', 'ঢাকা') else (settings_row.outside_delivery_fee if settings_row else Decimal('130.00'))
+                total_amount += Decimal(shipping_fee)
+
                 order_number = f"ORD-{uuid.uuid4().hex[:8].upper()}"
 
                 order = Order.objects.create(
                     order_number=order_number,
                     user=user,
                     total_amount=total_amount,
+                    shipping_fee=shipping_fee,
                     # FIX: use CharField values instead of booleans
                     payment_status='unpaid',
-                    order_status='pending'
+                    order_status='pending',
+                    shipping_address={
+                        'full_name': address.full_name, 'phone': address.phone,
+                        'city': address.city, 'state': address.state,
+                        'pincode': address.pincode, 'address': address.address,
+                    },
                 )
 
                 for item in cart_items:

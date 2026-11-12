@@ -8,6 +8,10 @@ class Order(models.Model):
     # "cancelled" with no way to distinguish them. Replaced with explicit choices.
     ORDER_STATUS_CHOICES = [
         ('pending', 'Pending'),
+        ('confirmed', 'Confirmed'),
+        ('packaging', 'Packaging'),
+        ('shipped', 'Shipped'),
+        ('delivered', 'Delivered'),
         ('processing', 'Processing'),
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled'),
@@ -22,9 +26,11 @@ class Order(models.Model):
     order_number = models.CharField(max_length=50)
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    shipping_fee = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     # FIX: payment_status was BooleanField; now has clear states
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='unpaid')
     order_status = models.CharField(max_length=20, choices=ORDER_STATUS_CHOICES, default='pending')
+    shipping_address = models.JSONField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

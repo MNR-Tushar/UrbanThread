@@ -85,6 +85,8 @@ class Userviewset(viewsets.ModelViewSet):
     queryset = User.objects.all()
 
     def get_object(self):
+        if self.request.user.is_staff and self.kwargs.get(self.lookup_field) != 'me':
+            return super().get_object()
         return self.request.user
     
     def get_queryset(self):

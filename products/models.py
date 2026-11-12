@@ -5,6 +5,7 @@ from django.utils.text import slugify
 
 class Category(models.Model):
     category_name = models.CharField(max_length=100)
+    parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='subcategories')
     description = models.TextField(blank=True, null=True)
     slug = models.SlugField(max_length=150, blank=True, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -35,6 +36,7 @@ class Brand(models.Model):
 
 class Product(models.Model):
     product_name = models.CharField(max_length=100)
+    sku = models.CharField(max_length=40, unique=True, null=True, blank=True)
     description = models.TextField(blank=True, null=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     # FIX: allow null/blank so a product can have no discount; default=0 keeps
@@ -65,6 +67,35 @@ class ProductImage(models.Model):
     # FIX: was using self.product which does not exist; field is named productimg
     def __str__(self):
         return f"Image for {self.productimg.product_name}"
+
+
+class StoreBanner(models.Model):
+    title = models.CharField(max_length=120)
+    subtitle = models.CharField(max_length=240, blank=True)
+    image = models.ImageField(upload_to='store_banners/')
+    link = models.CharField(max_length=300, blank=True)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order', 'id']
+
+    def __str__(self):
+        return self.title
+
+
+class StoreSettings(models.Model):
+    store_name = models.CharField(max_length=120, default='UrbanThread')
+    store_logo = models.ImageField(upload_to='store_settings/', blank=True, null=True)
+    help_phone = models.CharField(max_length=30, blank=True)
+    social_facebook = models.URLField(blank=True)
+    social_instagram = models.URLField(blank=True)
+    dhaka_delivery_fee = models.DecimalField(max_digits=8, decimal_places=2, default=70)
+    outside_delivery_fee = models.DecimalField(max_digits=8, decimal_places=2, default=130)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.store_name
 
 
 class Size(models.Model):

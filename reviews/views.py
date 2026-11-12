@@ -9,13 +9,13 @@ from .serializers import ReviewSerializer
 
 # ─── Cache Key Helpers ────────────────────────────────────────────────────────
 
-def _review_list_key(product_id=None) -> str:
+def _review_list_key(product_id=None, is_staff=False) -> str:
     if product_id:
-        return f"review_list:product:{product_id}"
-    return "review_list:all"
+        return f"review_list:{'staff' if is_staff else 'public'}:product:{product_id}"
+    return f"review_list:{'staff' if is_staff else 'public'}:all"
 
-def _review_detail_key(pk) -> str:
-    return f"review_detail:{pk}"
+def _review_detail_key(pk, is_staff=False) -> str:
+    return f"review_detail:{'staff' if is_staff else 'public'}:{pk}"
 
 
 REVIEW_CACHE_TTL = 60 * 10  # 10 minutes
@@ -33,6 +33,8 @@ class ReviewViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = Review.objects.select_related('user', 'product').all()
+        if not self.request.user.is_staff:
+            queryset = queryset.filter(is_approved=True)
         product_id = self.request.query_params.get('product_id')
         if product_id:
             queryset = queryset.filter(product_id=product_id)
@@ -42,7 +44,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         product_id = request.query_params.get('product_id')
-        cache_key = _review_list_key(product_id)
+        cache_key = _review_list_key(product_id, request.user.is_staff)
         cached = cache.get(cache_key)
         if cached is not None:
             return Response_from_cache(cached)
@@ -56,7 +58,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         from rest_framework.response import Response
-        cache_key = _review_detail_key(kwargs.get('pk'))
+        cache_key = _review_detail_key(kwargs.get('pk'), request.user.is_staff)
         cached = cache.get(cache_key)
         if cached is not None:
             return Response(cached)
@@ -69,14 +71,17 @@ class ReviewViewSet(viewsets.ModelViewSet):
 
     def _invalidate_review_cache(self, product_id=None, pk=None):
         # Invalidate all review caches
-        cache.delete(_review_list_key())
+        cache.delete(_review_list_key(is_staff=False))
+        cache.delete(_review_list_key(is_staff=True))
         if product_id:
-            cache.delete(_review_list_key(product_id))
+            cache.delete(_review_list_key(product_id, False))
+            cache.delete(_review_list_key(product_id, True))
         if pk:
-            cache.delete(_review_detail_key(pk))
+            cache.delete(_review_detail_key(pk, False))
+            cache.delete(_review_detail_key(pk, True))
 
     def perform_create(self, serializer):
-        instance = serializer.save(user=self.request.user)
+        instance = serializer.save(user=self.request.user, is_approved=False)
         self._invalidate_review_cache(product_id=instance.product_id)
 
     def perform_update(self, serializer):

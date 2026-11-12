@@ -204,16 +204,53 @@ class ProductImageViewSet(viewsets.ModelViewSet):
             cache.delete_pattern("*product_list:*")
         except AttributeError:
             cache.clear()
- 
+
     def perform_destroy(self, instance):
-        pk = instance.productimg_id
+        product_id = instance.productimg_id
         instance.delete()
-        cache.delete(_product_detail_key(pk))
+        cache.delete(_product_detail_key(product_id))
         try:
             cache.delete_pattern("*product_list:*")
         except AttributeError:
             cache.clear()
 
+
+@extend_schema(tags=["Store banners"])
+class StoreBannerViewSet(viewsets.ModelViewSet):
+    serializer_class = StoreBannerSerializer
+
+    def get_queryset(self):
+        queryset = StoreBanner.objects.all()
+        if not self.request.user.is_staff:
+            queryset = queryset.filter(is_active=True)
+        return queryset
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [AllowAny()]
+        return [IsAdminUser()]
+
+
+@extend_schema(tags=["Store settings"])
+class StoreSettingsViewSet(viewsets.ModelViewSet):
+    queryset = StoreSettings.objects.all().order_by('id')
+    serializer_class = StoreSettingsSerializer
+    permission_classes = [IsAdminUser]
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [AllowAny()]
+        return [IsAdminUser()]
+
+    def create(self, request, *args, **kwargs):
+        current = StoreSettings.objects.order_by('id').first()
+        if current:
+            serializer = self.get_serializer(current, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data)
+        return super().create(request, *args, **kwargs)
+ 
 @extend_schema(tags=["Products - Sizes"])
 class SizeViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Size.objects.all()

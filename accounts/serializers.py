@@ -10,8 +10,13 @@ class CustomUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
-        fields = ("id", "username", "email", "first_name", "last_name", "phone", "address", "is_staff", "is_superuser")
+        fields = ("id", "username", "email", "first_name", "last_name", "phone", "address", "is_staff", "is_superuser", "is_active")
         read_only_fields = ("is_staff", "is_superuser")
+
+    def validate_is_active(self, value):
+        if not self.context['request'].user.is_staff:
+            raise serializers.ValidationError("Only staff can change account access.")
+        return value
 
 class UserRegisterationSerializer(serializers.ModelSerializer):
     """
