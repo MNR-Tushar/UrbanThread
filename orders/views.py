@@ -224,6 +224,7 @@ class OrderViewSet(viewsets.GenericViewSet):
                 )
 
                 cart_items.delete()
+                transaction.on_commit(lambda: cache.delete(f"cart:{user.id}"))
                 transaction.on_commit(lambda: _enqueue_task(send_order_invoice_email, order.id))
                 transaction.on_commit(lambda: _enqueue_task(sync_order_stock, order.id))
                 transaction.on_commit(lambda: _enqueue_task(push_order_analytics_event, order.id, "order_placed"))
