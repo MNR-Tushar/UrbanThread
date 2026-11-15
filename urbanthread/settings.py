@@ -11,7 +11,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-s&$9k=^wje4etnj+k1v(a98o80ivik#vxyov+u%v!(h$k8uv*t')
 DEBUG_VALUE = str(config('DEBUG', default='True')).strip().lower()
 DEBUG = DEBUG_VALUE in {'1', 'true', 'yes', 'on'}
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=lambda v: [s.strip() for s in v.split(',')])
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=lambda v: [s.strip() for s in v.split(',') if s.strip()])
+render_hostname = config('RENDER_EXTERNAL_HOSTNAME', default='').strip()
+if render_hostname and render_hostname not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(render_hostname)
 
 
 # Application definition
@@ -160,15 +163,11 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = False
 from corsheaders.defaults import default_headers
 CORS_ALLOW_HEADERS = (*default_headers, 'x-guest-cart')
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:5174",
-    "http://127.0.0.1:5174",
-    "http://localhost:8080",
-]
+CORS_ALLOWED_ORIGINS = config(
+    'CORS_ALLOWED_ORIGINS',
+    default='http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:8080',
+    cast=lambda value: [origin.strip().rstrip('/') for origin in value.split(',') if origin.strip()],
+)
 
 # Password validation
 
