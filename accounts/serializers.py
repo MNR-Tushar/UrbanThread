@@ -10,8 +10,8 @@ class CustomUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
-        fields = ("id", "username", "email", "first_name", "last_name", "phone", "address", "is_staff", "is_superuser", "is_active", "date_joined")
-        read_only_fields = ("is_staff", "is_superuser", "date_joined")
+        fields = ("id", "username", "email", "email_verified", "first_name", "last_name", "phone", "address", "is_staff", "is_superuser", "is_active", "date_joined")
+        read_only_fields = ("email_verified", "is_staff", "is_superuser", "date_joined")
 
     def validate_is_active(self, value):
         if not self.context['request'].user.is_staff:
@@ -29,6 +29,8 @@ class UserRegisterationSerializer(serializers.ModelSerializer):
         extra_kwargs = {"password": {"write_only": True}}
 
     def create(self, validated_data):
+        validated_data['is_active'] = False
+        validated_data['email_verified'] = False
         return CustomUser.objects.create_user(**validated_data)
 
 class UserLoginSerializer(serializers.Serializer):
@@ -79,6 +81,19 @@ class ChangePasswordSerializer(serializers.Serializer):
         if attrs['new_password'] != attrs['confirm_password']:
             raise serializers.ValidationError({'confirm_password': 'Passwords do not match.'})
         return attrs
+
+
+class EmailVerificationRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class EmailVerificationConfirmSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp = serializers.RegexField(r'^\d{6}$')
+
+
+class GoogleSignInSerializer(serializers.Serializer):
+    credential = serializers.CharField(trim_whitespace=True)
     
     
 class ProfileSerializer(serializers.ModelSerializer):

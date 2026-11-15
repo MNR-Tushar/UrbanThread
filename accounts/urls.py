@@ -17,6 +17,9 @@ urlpatterns = [
     path("password/reset/request/", PasswordResetRequestView.as_view(), name="password-reset-request"),
     path("password/reset/confirm/", PasswordResetConfirmView.as_view(), name="password-reset-confirm"),
     path("password/change/", ChangePasswordView.as_view(), name="password-change"),
+    path("email/verification/resend/", EmailVerificationResendView.as_view(), name="email-verification-resend"),
+    path("email/verification/confirm/", EmailVerificationConfirmView.as_view(), name="email-verification-confirm"),
+    path("google/", GoogleSignInView.as_view(), name="google-sign-in"),
     path("", include(router.urls)),
 
 ]

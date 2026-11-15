@@ -12,6 +12,8 @@ import logging
 import re
 import secrets
 import requests
+import uuid
+from django.utils.text import slugify
 from rest_framework import status, viewsets
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.generics import GenericAPIView
@@ -21,7 +23,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from drf_spectacular.utils import extend_schema, extend_schema_view
 
 from .serializers import *
-from .models import Profile, Address, PasswordResetOTP
+from .models import Profile, Address, PasswordResetOTP, EmailVerificationOTP
 from .tasks import send_welcome_email
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -65,6 +67,165 @@ def _deliver_reset_otp(user, channel, code):
         timeout=10,
     )
     response.raise_for_status()
+
+
+def _issue_email_verification_code(user):
+    now = timezone.now()
+    EmailVerificationOTP.objects.filter(user=user, consumed_at__isnull=True).update(consumed_at=now)
+    code = f'{secrets.randbelow(1_000_000):06d}'
+    EmailVerificationOTP.objects.create(
+        user=user,
+        code_hash=make_password(code),
+        expires_at=now + timedelta(minutes=15),
+    )
+    EmailMultiAlternatives(
+        'Verify your UrbanThread email',
+        f'Your email verification code is {code}. It expires in 15 minutes.',
+        settings.DEFAULT_FROM_EMAIL,
+        [user.email],
+    ).send(fail_silently=False)
+
+
+def _auth_payload(user):
+    refresh = RefreshToken.for_user(user)
+    data = CustomUserSerializer(user).data
+    data['tokens'] = {'refresh': str(refresh), 'access': str(refresh.access_token)}
+    return data
+
+
+def _verify_google_credential(credential):
+    if not settings.GOOGLE_CLIENT_ID:
+        raise RuntimeError('Google OAuth is not configured.')
+    try:
+        from google.auth import exceptions as google_auth_exceptions
+        from google.auth.transport.requests import Request as GoogleRequest
+        from google.oauth2 import id_token
+    except ImportError as exc:
+        raise RuntimeError('Install the backend requirements to enable Google OAuth.') from exc
+    try:
+        return id_token.verify_oauth2_token(credential, GoogleRequest(), settings.GOOGLE_CLIENT_ID)
+    except google_auth_exceptions.TransportError as exc:
+        raise RuntimeError('Google token verification is temporarily unavailable.') from exc
+
+
+def _new_google_username(email):
+    stem = slugify(email.split('@', 1)[0])[:24] or 'customer'
+    while True:
+        username = f'{stem}-{uuid.uuid4().hex[:8]}'
+        if not User.objects.filter(username=username).exists():
+            return username
+
+
+class EmailVerificationResendView(GenericAPIView):
+    permission_classes = (AllowAny,)
+    serializer_class = EmailVerificationRequestSerializer
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = 'email_verification_request'
+
+    @extend_schema(tags=['Accounts - Email Verification'])
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = User.objects.filter(email__iexact=serializer.validated_data['email']).first()
+        if user and not (user.is_active and user.email_verified):
+            try:
+                _issue_email_verification_code(user)
+            except Exception:
+                logger.exception('Could not send email verification code')
+                return Response({'error': 'Could not send the verification code. Please try again later.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        return Response({'detail': 'If verification is needed for this email, a code has been sent.'})
+
+
+class EmailVerificationConfirmView(GenericAPIView):
+    permission_classes = (AllowAny,)
+    serializer_class = EmailVerificationConfirmSerializer
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = 'email_verification_confirm'
+
+    @extend_schema(tags=['Accounts - Email Verification'])
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data['email']
+        user = User.objects.filter(email__iexact=email).first()
+        if not user:
+            return Response({'error': 'The verification code is invalid or expired.'}, status=status.HTTP_400_BAD_REQUEST)
+        with transaction.atomic():
+            otp = EmailVerificationOTP.objects.select_for_update().filter(
+                user=user, consumed_at__isnull=True,
+            ).order_by('-created_at').first()
+            if not otp or otp.expires_at <= timezone.now() or otp.attempts >= 5:
+                return Response({'error': 'The verification code is invalid or expired.'}, status=status.HTTP_400_BAD_REQUEST)
+            if not check_password(serializer.validated_data['otp'], otp.code_hash):
+                otp.attempts += 1
+                otp.save(update_fields=['attempts'])
+                return Response({'error': 'The verification code is invalid or expired.'}, status=status.HTTP_400_BAD_REQUEST)
+            user.email_verified = True
+            user.is_active = True
+            user.save(update_fields=['email_verified', 'is_active'])
+            otp.consumed_at = timezone.now()
+            otp.save(update_fields=['consumed_at'])
+            EmailVerificationOTP.objects.filter(user=user, consumed_at__isnull=True).update(consumed_at=timezone.now())
+        try:
+            send_welcome_email.delay(user.pk)
+        except Exception:
+            logger.exception('Could not queue welcome email')
+        return Response(_auth_payload(user))
+
+
+class GoogleSignInView(GenericAPIView):
+    permission_classes = (AllowAny,)
+    serializer_class = GoogleSignInSerializer
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = 'google_sign_in'
+
+    @extend_schema(tags=['Accounts - Google OAuth'])
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            claims = _verify_google_credential(serializer.validated_data['credential'])
+        except RuntimeError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except Exception:
+            logger.info('Rejected invalid Google ID token')
+            return Response({'error': 'Google sign-in could not be verified.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not claims.get('email_verified') or not claims.get('sub') or not claims.get('email'):
+            return Response({'error': 'Google must provide a verified email address.'}, status=status.HTTP_400_BAD_REQUEST)
+        email = claims['email'].strip().lower()
+        google_sub = claims['sub']
+        user = User.objects.filter(google_sub=google_sub).first()
+        if user:
+            if not user.is_active:
+                return Response({'error': 'This account is disabled.'}, status=status.HTTP_403_FORBIDDEN)
+            return Response(_auth_payload(user))
+
+        user = User.objects.filter(email__iexact=email).first()
+        if user:
+            if not user.is_active:
+                return Response({'error': 'This account is disabled.'}, status=status.HTTP_403_FORBIDDEN)
+            authoritative_email = email.endswith('@gmail.com') or bool(claims.get('hd'))
+            if not user.email_verified or not authoritative_email:
+                return Response({'error': 'An account already uses this email. Verify and sign in to that account before linking Google.'}, status=status.HTTP_409_CONFLICT)
+            if user.google_sub and user.google_sub != google_sub:
+                return Response({'error': 'This account is already linked to another Google account.'}, status=status.HTTP_409_CONFLICT)
+            user.google_sub = google_sub
+            user.save(update_fields=['google_sub'])
+        else:
+            user = User.objects.create_user(
+                email=email,
+                password=None,
+                username=_new_google_username(email),
+                first_name=claims.get('given_name', '')[:30],
+                last_name=claims.get('family_name', '')[:30],
+                is_active=True,
+                email_verified=True,
+                google_sub=google_sub,
+            )
+            user.set_unusable_password()
+            user.save(update_fields=['password'])
+        return Response(_auth_payload(user))
 
 
 class PasswordResetRequestView(GenericAPIView):
@@ -175,13 +336,14 @@ class UserRegisterationAPIView(GenericAPIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         try:
-            send_welcome_email.delay(user.pk)
-        except Exception as e:
-            logger.error("Failed to send welcome email for user %s: %s", user.pk, e)    
-        token = RefreshToken.for_user(user)
-        data = serializer.data
-        data["tokens"] = {"refresh": str(token), "access": str(token.access_token)}
-        return Response(data, status=status.HTTP_201_CREATED)
+            _issue_email_verification_code(user)
+        except Exception:
+            logger.exception('Could not send registration verification code')
+            return Response({'error': 'Account created, but the verification email could not be sent. Request a new code.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        return Response(
+            {'detail': 'Account created. Enter the verification code sent to your email.', 'email': user.email, 'verification_required': True},
+            status=status.HTTP_201_CREATED,
+        )
 
 class UserLoginAPIView(GenericAPIView):
     """

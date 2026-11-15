@@ -252,6 +252,7 @@ SSLCOMMERZ_IS_SANDBOX=True
 
 # Frontend URL (for payment redirects)
 FRONTEND_URL=http://localhost:3000
+GOOGLE_CLIENT_ID=your-google-oauth-web-client-id.apps.googleusercontent.com
 
 # Email
 EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
@@ -332,6 +333,9 @@ Base URL: `/accounts/`
 | -------------------- | ----------------------------- | -------- | -------------------------------- |
 | POST                 | `/accounts/register/`         | Public   | Register + sends verification email |
 | POST                 | `/accounts/login/`            | Public   | Login and receive JWT tokens     |
+| POST                 | `/accounts/email/verification/resend/` | Public | Resend account verification code |
+| POST                 | `/accounts/email/verification/confirm/` | Public | Verify email and receive JWT tokens |
+| POST                 | `/accounts/google/` | Public | Verify Google ID token and sign in/register |
 | POST                 | `/accounts/logout/`           | Required | Blacklist refresh token / logout |
 | POST                 | `/accounts/token/refresh/`    | Public   | Refresh access token             |
 | POST                 | `/accounts/password/reset/request/` | Public | Send password-reset OTP to email or phone |
@@ -353,7 +357,9 @@ POST /accounts/register/
   "password": "securepassword123"
 }
 ```
-> A verification email is sent asynchronously via Celery after registration.
+> An email verification code is sent during registration. A welcome email is queued after the account is verified.
+
+New password-based registrations remain inactive until the email OTP is verified. Set the same Google OAuth **Web client ID** in backend `GOOGLE_CLIENT_ID` and frontend `VITE_GOOGLE_CLIENT_ID`; add the frontend origins (for example `http://localhost:5173`) to the OAuth client's allowed JavaScript origins. The backend verifies Google ID tokens with Google's `google-auth` library.
 
 Phone OTP expects the configured SMS API to accept a Bearer token and a JSON body with `to`, `message`, and `sender`. Configure SMTP variables for email OTP delivery. OTPs expire after 10 minutes and allow at most five verification attempts.
 

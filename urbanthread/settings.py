@@ -228,6 +228,9 @@ REST_FRAMEWORK = {
         'password_reset_request': '3/hour',
         'password_reset_confirm': '10/hour',
         'password_change': '5/hour',
+        'email_verification_request': '5/hour',
+        'email_verification_confirm': '10/hour',
+        'google_sign_in': '20/minute',
     },
 }
 
@@ -341,6 +344,7 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@urbanthread.c
 SMS_API_URL = config('SMS_API_URL', default='')
 SMS_API_TOKEN = config('SMS_API_TOKEN', default='')
 SMS_SENDER_ID = config('SMS_SENDER_ID', default='UrbanThread')
+GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID', default='')
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
