@@ -221,6 +221,11 @@ REST_FRAMEWORK = {
         'django_filters.rest_framework.DjangoFilterBackend',
     ),
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_THROTTLE_RATES': {
+        'login': '5/minute',
+        'register': '5/hour',
+        'coupon_validate': '30/minute',
+    },
 }
 
 # drf-spectacular (OpenAPI/Swagger) configuration

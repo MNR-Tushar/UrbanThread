@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from django.core.cache import cache
 from datetime import date
 from drf_spectacular.utils import extend_schema
@@ -30,6 +31,12 @@ VALIDATE_CACHE_TTL  = 60 * 5    # 5 minutes
 class CouponViewset(viewsets.ModelViewSet):
     queryset = Coupon.objects.all()
     serializer_class = CouponSerializer
+
+    def get_throttles(self):
+        if self.action == 'validate_coupon':
+            self.throttle_scope = 'coupon_validate'
+            return [ScopedRateThrottle()]
+        return super().get_throttles()
 
     def get_permissions(self):
         if self.action in ['validate_coupon']:

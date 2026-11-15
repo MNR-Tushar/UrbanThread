@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 import logging
 from rest_framework import status, viewsets
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -20,6 +21,8 @@ class UserRegisterationAPIView(GenericAPIView):
 
     permission_classes = (AllowAny,)
     serializer_class =UserRegisterationSerializer
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = 'register'
 
     @extend_schema(tags=["Accounts - Register"])
     def post(self, request, *args, **kwargs):
@@ -42,6 +45,8 @@ class UserLoginAPIView(GenericAPIView):
 
     permission_classes = (AllowAny,)
     serializer_class = UserLoginSerializer
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = 'login'
     
     @extend_schema(tags=["Accounts - Login"])
     def post(self, request, *args, **kwargs):
