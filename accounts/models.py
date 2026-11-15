@@ -47,4 +47,18 @@ class Address(models.Model):
     
     def __str__(self):
         return f"{self.full_name} - {self.city}"
+
+
+class PasswordResetOTP(models.Model):
+    CHANNEL_CHOICES = [('email', 'Email'), ('phone', 'Phone')]
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='password_reset_otps')
+    channel = models.CharField(max_length=10, choices=CHANNEL_CHOICES)
+    code_hash = models.CharField(max_length=128)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+    consumed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=['user', 'channel', 'created_at'])]
  

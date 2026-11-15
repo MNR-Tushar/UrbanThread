@@ -225,6 +225,9 @@ REST_FRAMEWORK = {
         'login': '5/minute',
         'register': '5/hour',
         'coupon_validate': '30/minute',
+        'password_reset_request': '3/hour',
+        'password_reset_confirm': '10/hour',
+        'password_change': '5/hour',
     },
 }
 
@@ -335,6 +338,9 @@ EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@urbanthread.com')
+SMS_API_URL = config('SMS_API_URL', default='')
+SMS_API_TOKEN = config('SMS_API_TOKEN', default='')
+SMS_SENDER_ID = config('SMS_SENDER_ID', default='UrbanThread')
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

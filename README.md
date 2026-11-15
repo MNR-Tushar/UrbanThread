@@ -261,6 +261,11 @@ EMAIL_USE_TLS=True
 EMAIL_HOST_USER=your@email.com
 EMAIL_HOST_PASSWORD=your-app-password
 DEFAULT_FROM_EMAIL=noreply@urbanthread.com
+
+# Optional phone OTP provider (Bearer token + JSON API)
+SMS_API_URL=https://your-sms-provider.example/send
+SMS_API_TOKEN=your-sms-api-token
+SMS_SENDER_ID=UrbanThread
 ```
 
 ---
@@ -329,6 +334,9 @@ Base URL: `/accounts/`
 | POST                 | `/accounts/login/`            | Public   | Login and receive JWT tokens     |
 | POST                 | `/accounts/logout/`           | Required | Blacklist refresh token / logout |
 | POST                 | `/accounts/token/refresh/`    | Public   | Refresh access token             |
+| POST                 | `/accounts/password/reset/request/` | Public | Send password-reset OTP to email or phone |
+| POST                 | `/accounts/password/reset/confirm/` | Public | Verify OTP and set a new password |
+| POST                 | `/accounts/password/change/` | Required | Change password using current password |
 | GET                  | `/accounts/allusers/`         | Required | List users (admins see all)      |
 | GET/PUT/PATCH        | `/accounts/allusers/{id}/`    | Required | Get/update user                  |
 | GET/POST             | `/accounts/address/`          | Required | List or create addresses         |
@@ -346,6 +354,8 @@ POST /accounts/register/
 }
 ```
 > A verification email is sent asynchronously via Celery after registration.
+
+Phone OTP expects the configured SMS API to accept a Bearer token and a JSON body with `to`, `message`, and `sender`. Configure SMTP variables for email OTP delivery. OTPs expire after 10 minutes and allow at most five verification attempts.
 
 ---
 
