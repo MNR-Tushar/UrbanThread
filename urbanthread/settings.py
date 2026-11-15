@@ -3,7 +3,7 @@ from datetime import timedelta
 from pathlib import Path
 from decouple import config
 import dj_database_url
-import cloudinary
+from django.core.exceptions import ImproperlyConfigured
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -224,6 +224,13 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Keep local filesystem storage available for development without Cloudinary keys.
 CLOUDINARY_URL = config('CLOUDINARY_URL', default='').strip()
 if CLOUDINARY_URL:
+    if not CLOUDINARY_URL.startswith('cloudinary://'):
+        raise ImproperlyConfigured(
+            'CLOUDINARY_URL must use the format cloudinary://API_KEY:API_SECRET@CLOUD_NAME.'
+        )
+    os.environ.setdefault('CLOUDINARY_URL', CLOUDINARY_URL)
+    import cloudinary
+
     # The SDK reads CLOUDINARY_URL from the environment; this also enforces HTTPS URLs.
     cloudinary.config(secure=True)
     STORAGES = {
