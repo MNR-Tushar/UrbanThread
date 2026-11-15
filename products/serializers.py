@@ -20,6 +20,7 @@ class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductImage
         fields = '__all__'
+        read_only_fields = ('image_small', 'image_medium')
 
 
 class StoreBannerSerializer(serializers.ModelSerializer):

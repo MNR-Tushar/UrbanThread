@@ -3,6 +3,10 @@ from django.conf import settings
 import uuid
 from django.utils.text import slugify
 from django.utils import timezone
+from io import BytesIO
+from pathlib import Path
+from PIL import Image, ImageOps
+from django.core.files.base import ContentFile
 
 
 class Category(models.Model):
@@ -78,7 +82,48 @@ class Product(models.Model):
 class ProductImage(models.Model):
     productimg = models.ForeignKey(Product, on_delete=models.CASCADE)
     image = models.ImageField(upload_to='product_images/', blank=True, null=True)
+    image_small = models.ImageField(upload_to='product_images/optimized/', blank=True, null=True, editable=False)
+    image_medium = models.ImageField(upload_to='product_images/optimized/', blank=True, null=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._original_image_name = self.image.name if self.image else ''
+
+    def save(self, *args, **kwargs):
+        image_changed = bool(self.image and self.image.name != self._original_image_name)
+        super().save(*args, **kwargs)
+        if image_changed:
+            self._generate_responsive_images()
+            type(self).objects.filter(pk=self.pk).update(
+                image_small=self.image_small.name if self.image_small else '',
+                image_medium=self.image_medium.name if self.image_medium else '',
+            )
+            self._original_image_name = self.image.name
+
+    def _generate_responsive_images(self):
+        if not self.image:
+            return
+        try:
+            with self.image.open('rb') as source:
+                original = ImageOps.exif_transpose(Image.open(source))
+                if original.mode not in ('RGB', 'RGBA'):
+                    original = original.convert('RGBA' if 'transparency' in original.info else 'RGB')
+                stem = Path(self.image.name).stem
+                for field_name, max_size in (('image_small', (480, 480)), ('image_medium', (960, 960))):
+                    variant = original.copy()
+                    variant.thumbnail(max_size, Image.Resampling.LANCZOS)
+                    output = BytesIO()
+                    variant.save(output, format='WEBP', quality=82, method=6)
+                    getattr(self, field_name).save(
+                        f'{stem}_{max_size[0]}.webp',
+                        ContentFile(output.getvalue()),
+                        save=False,
+                    )
+        except (OSError, ValueError):
+            # Keep the original usable when an uploaded file is not a supported raster image.
+            self.image_small = None
+            self.image_medium = None
 
     # FIX: was using self.product which does not exist; field is named productimg
     def __str__(self):
