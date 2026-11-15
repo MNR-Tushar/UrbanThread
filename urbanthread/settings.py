@@ -1,6 +1,7 @@
 import os
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 from decouple import config
 import dj_database_url
 from django.core.exceptions import ImproperlyConfigured
@@ -228,18 +229,52 @@ if CLOUDINARY_URL:
         raise ImproperlyConfigured(
             'CLOUDINARY_URL must use the format cloudinary://API_KEY:API_SECRET@CLOUD_NAME.'
         )
+    parsed_cloudinary_url = urlsplit(CLOUDINARY_URL)
+    CLOUDINARY_API_KEY = unquote(parsed_cloudinary_url.username or '')
+    CLOUDINARY_API_SECRET = unquote(parsed_cloudinary_url.password or '')
+    CLOUDINARY_CLOUD_NAME = parsed_cloudinary_url.hostname or ''
+    if not all((CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, CLOUDINARY_CLOUD_NAME)):
+        raise ImproperlyConfigured(
+            'CLOUDINARY_URL must include API_KEY, API_SECRET, and CLOUD_NAME.'
+        )
     os.environ.setdefault('CLOUDINARY_URL', CLOUDINARY_URL)
     import cloudinary
 
-    # The SDK reads CLOUDINARY_URL from the environment; this also enforces HTTPS URLs.
-    cloudinary.config(secure=True)
+    cloudinary.config(
+        cloud_name=CLOUDINARY_CLOUD_NAME,
+        api_key=CLOUDINARY_API_KEY,
+        api_secret=CLOUDINARY_API_SECRET,
+        secure=True,
+    )
     STORAGES = {
         'default': {'BACKEND': 'urbanthread.storage.CloudinaryMediaStorage'},
         'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
     }
 else:
+    CLOUDINARY_CLOUD_NAME = config('CLOUDINARY_CLOUD_NAME', default='').strip()
+    CLOUDINARY_API_KEY = config('CLOUDINARY_API_KEY', default='').strip()
+    CLOUDINARY_API_SECRET = config('CLOUDINARY_API_SECRET', default='').strip()
+    cloudinary_values = (CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET)
+    if any(cloudinary_values) and not all(cloudinary_values):
+        raise ImproperlyConfigured(
+            'Set all of CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET.'
+        )
+
+    if all(cloudinary_values):
+        import cloudinary
+
+        cloudinary.config(
+            cloud_name=CLOUDINARY_CLOUD_NAME,
+            api_key=CLOUDINARY_API_KEY,
+            api_secret=CLOUDINARY_API_SECRET,
+            secure=True,
+        )
+        default_storage_backend = 'urbanthread.storage.CloudinaryMediaStorage'
+    else:
+        default_storage_backend = 'django.core.files.storage.FileSystemStorage'
+
     STORAGES = {
-        'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+        'default': {'BACKEND': default_storage_backend},
         'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
     }
 
