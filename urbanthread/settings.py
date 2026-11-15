@@ -2,6 +2,7 @@ import os
 from datetime import timedelta
 from pathlib import Path
 from decouple import config
+import dj_database_url
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -79,26 +80,37 @@ WSGI_APPLICATION = 'urbanthread.wsgi.application'
 
 # ─── Database (PostgreSQL) ────────────────────────────────────────────────────
 
-# Database - PostgreSQL
-db_engine = config('DB_ENGINE', default='django.db.backends.sqlite3')
-if 'sqlite' in db_engine:
+# Prefer a hosted DATABASE_URL (for Render/Supabase); otherwise retain the local DB_ENGINE settings.
+database_url = config('DATABASE_URL', default='').strip()
+if database_url:
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
+        'default': dj_database_url.parse(
+            database_url,
+            conn_max_age=600,
+            conn_health_checks=True,
+            ssl_require=True,
+        )
     }
 else:
-    DATABASES = {
-        'default': {
-            'ENGINE': db_engine,
-            'NAME': config('DB_NAME', default='urbanthread'),
-            'USER': config('DB_USER', default=''),
-            'PASSWORD': config('DB_PASSWORD', default=''),
-            'HOST': config('DB_HOST', default='localhost'),
-            'PORT': config('DB_PORT', default=''),
+    db_engine = config('DB_ENGINE', default='django.db.backends.sqlite3')
+    if 'sqlite' in db_engine:
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
         }
-    }
+    else:
+        DATABASES = {
+            'default': {
+                'ENGINE': db_engine,
+                'NAME': config('DB_NAME', default='urbanthread'),
+                'USER': config('DB_USER', default=''),
+                'PASSWORD': config('DB_PASSWORD', default=''),
+                'HOST': config('DB_HOST', default='localhost'),
+                'PORT': config('DB_PORT', default=''),
+            }
+        }
 
 # Cache Configuration
 REDIS_URL = config('REDIS_URL', default='locmem')
