@@ -9,6 +9,7 @@ from django.utils import timezone
 from datetime import timedelta
 from django.core.cache import cache
 from decimal import Decimal
+from django.http import HttpResponse
 import uuid
 import logging
 
@@ -19,7 +20,7 @@ from inventory.models import Inventory
 from accounts.models import Address
 from payments.models import Payment
 from coupons.models import Coupon
-from products.models import StoreSettings
+from products.models import StoreSettings, DeliveryZone
 from .tasks import (
     generate_sales_report,
     push_order_analytics_event,
@@ -99,7 +100,34 @@ class OrderViewSet(viewsets.GenericViewSet):
         order.save(update_fields=['order_status', 'updated_at'])
         if previous_status != next_status:
             OrderStatusHistory.objects.create(order=order, status=next_status, note=f'Status changed from {previous_status} to {next_status}.')
+            from .tasks import send_order_status_email
+            transaction.on_commit(lambda: _enqueue_task(send_order_status_email, order.id))
         return Response(OrderSerializer(order).data)
+
+    @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
+    def admin_update_tracking(self, request, pk=None):
+        if not request.user.is_staff and not request.user.is_superuser:
+            return Response({'detail': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
+        order = Order.objects.filter(pk=pk).first()
+        if not order:
+            return Response({'detail': 'Order not found.'}, status=status.HTTP_404_NOT_FOUND)
+        for field in ('courier_name', 'courier_tracking_id', 'courier_tracking_url'):
+            if field in request.data:
+                setattr(order, field, request.data[field])
+        order.save(update_fields=['courier_name', 'courier_tracking_id', 'courier_tracking_url', 'updated_at'])
+        return Response(OrderSerializer(order).data)
+
+    @action(detail=True, methods=['get'])
+    def invoice(self, request, pk=None):
+        order = self.get_queryset().filter(pk=pk).first()
+        if order is None and (request.user.is_staff or request.user.is_superuser):
+            order = Order.objects.filter(pk=pk).first()
+        if order is None:
+            return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+        from .invoices import invoice_pdf
+        response = HttpResponse(invoice_pdf(order), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{order.order_number}.pdf"'
+        return response
 
     def get_queryset(self):
         user = self.request.user
@@ -148,7 +176,7 @@ class OrderViewSet(viewsets.GenericViewSet):
 
                 total_amount = Decimal('0.00')
                 for item in cart_items:
-                    price = item.product.discount_price if item.product.discount_price and item.product.discount_price > 0 else item.product.price
+                    price = item.product.current_price
                     total_amount += Decimal(price) * item.quantity
 
                 discount = Decimal('0.00')
@@ -164,7 +192,13 @@ class OrderViewSet(viewsets.GenericViewSet):
 
                 settings_row = StoreSettings.objects.order_by('id').first()
                 city = (address.city or '').strip().lower()
-                shipping_fee = (settings_row.dhaka_delivery_fee if settings_row else Decimal('70.00')) if city in ('dhaka', 'ঢাকা') else (settings_row.outside_delivery_fee if settings_row else Decimal('130.00'))
+                area = (address.state or '').strip().lower()
+                address_text = f'{city} {area} {(address.address or "").lower()}'
+                zone = next((z for z in DeliveryZone.objects.filter(is_active=True) for term in z.areas.split(',') if term.strip() and term.strip().lower() in address_text), None)
+                shipping_fee = zone.delivery_fee if zone else ((settings_row.dhaka_delivery_fee if settings_row else Decimal('70.00')) if city in ('dhaka', 'ঢাকা') else (settings_row.outside_delivery_fee if settings_row else Decimal('130.00')))
+                threshold = settings_row.free_shipping_threshold if settings_row else Decimal('2500.00')
+                if total_amount >= threshold:
+                    shipping_fee = Decimal('0.00')
                 total_amount += Decimal(shipping_fee)
 
                 order_number = f"ORD-{uuid.uuid4().hex[:8].upper()}"
@@ -186,7 +220,7 @@ class OrderViewSet(viewsets.GenericViewSet):
                 OrderStatusHistory.objects.create(order=order, status='pending', note='Order placed.')
 
                 for item in cart_items:
-                    price = item.product.discount_price if item.product.discount_price and item.product.discount_price > 0 else item.product.price
+                    price = item.product.current_price
 
                     OrderItem.objects.create(
                         order=order,

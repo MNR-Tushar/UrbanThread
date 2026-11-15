@@ -44,8 +44,26 @@ def send_order_invoice_email(order_id: int) -> str:
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=[order.user.email],
     )
+    from .invoices import invoice_pdf
+    msg.attach(f'{order.order_number}.pdf', invoice_pdf(order), 'application/pdf')
     msg.send(fail_silently=False)
     return f"invoice_sent:{order.order_number}"
+
+
+@shared_task(name="orders.tasks.send_order_status_email", max_retries=3, default_retry_delay=60)
+def send_order_status_email(order_id: int) -> str:
+    try:
+        order = Order.objects.select_related('user').get(pk=order_id)
+    except Order.DoesNotExist:
+        return f"skipped: order {order_id} not found"
+    msg = EmailMultiAlternatives(
+        subject=f"Order update - {order.order_number}",
+        body=f"Your order {order.order_number} is now {order.order_status}. Courier: {order.courier_name or 'Pending'}. Tracking ID: {order.courier_tracking_id or 'Pending'}.",
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[order.user.email],
+    )
+    msg.send(fail_silently=False)
+    return f"status_email_sent:{order.order_number}"
 
 
 @shared_task(name="orders.tasks.sync_order_stock", max_retries=2, default_retry_delay=30)

@@ -64,12 +64,13 @@ class BrandMiniSerializer(serializers.ModelSerializer):
 class ProductListSerializer(serializers.ModelSerializer):
     category = CategoryMiniSerializer(read_only=True)
     brand = BrandMiniSerializer(read_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     # FIX: source was 'images' (nonexistent); correct reverse accessor is 'productimage_set'
     images = ProductImageSerializer(many=True, read_only=True, source='productimage_set')
 
     class Meta:
         model = Product
-        fields = '__all__'
+        fields = ['id', 'product_name', 'sku', 'description', 'price', 'discount_price', 'compare_at_price', 'sale_starts_at', 'sale_ends_at', 'is_featured', 'is_available', 'slug', 'created_at', 'updated_at', 'category', 'brand', 'images', 'current_price']
         read_only_fields = ('created_at', 'slug')
 
 
@@ -79,12 +80,13 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, read_only=True, source='productimage_set')
     category_id = serializers.IntegerField(write_only=True)
     brand_id = serializers.IntegerField(write_only=True)
+    current_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
 
     class Meta:
         model = Product
-        fields = ['id', 'product_name', 'sku', 'description', 'price', 'discount_price',
+        fields = ['id', 'product_name', 'sku', 'description', 'price', 'discount_price', 'compare_at_price', 'sale_starts_at', 'sale_ends_at', 'is_featured',
                   'is_available', 'slug', 'created_at', 'category', 'brand',
-                  'images', 'category_id', 'brand_id','updated_at']
+                  'images', 'category_id', 'brand_id','updated_at', 'current_price']
         read_only_fields = ['slug', 'created_at']
 
     def create(self, validated_data):
@@ -99,3 +101,9 @@ class WishlistItemSerializer(serializers.ModelSerializer):
         model = WishlistItem
         fields = ['id', 'product', 'product_id', 'created_at']
         read_only_fields = ['created_at']
+
+
+class DeliveryZoneSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DeliveryZone
+        fields = ['id', 'name', 'areas', 'delivery_fee', 'is_active']

@@ -2,6 +2,7 @@ from django.db import models
 from django.conf import settings
 import uuid
 from django.utils.text import slugify
+from django.utils import timezone
 
 
 class Category(models.Model):
@@ -43,6 +44,10 @@ class Product(models.Model):
     # FIX: allow null/blank so a product can have no discount; default=0 keeps
     # the existing > 0 checks in cart/order logic working correctly.
     discount_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, default=0)
+    compare_at_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    sale_starts_at = models.DateTimeField(null=True, blank=True)
+    sale_ends_at = models.DateTimeField(null=True, blank=True)
+    is_featured = models.BooleanField(default=False)
     is_available = models.BooleanField(default=True)
     slug = models.SlugField(max_length=150, blank=True, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -53,6 +58,14 @@ class Product(models.Model):
 
     def __str__(self):
         return self.product_name
+
+    @property
+    def current_price(self):
+        now = timezone.now()
+        sale_active = (self.discount_price and self.discount_price > 0 and
+                       (not self.sale_starts_at or self.sale_starts_at <= now) and
+                       (not self.sale_ends_at or self.sale_ends_at >= now))
+        return self.discount_price if sale_active else self.price
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -94,6 +107,7 @@ class StoreSettings(models.Model):
     social_youtube = models.URLField(blank=True)
     dhaka_delivery_fee = models.DecimalField(max_digits=8, decimal_places=2, default=70)
     outside_delivery_fee = models.DecimalField(max_digits=8, decimal_places=2, default=130)
+    free_shipping_threshold = models.DecimalField(max_digits=10, decimal_places=2, default=2500)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
@@ -108,6 +122,16 @@ class WishlistItem(models.Model):
     class Meta:
         ordering = ['-created_at']
         constraints = [models.UniqueConstraint(fields=['user', 'product'], name='unique_user_wishlist_product')]
+
+
+class DeliveryZone(models.Model):
+    name = models.CharField(max_length=100)
+    areas = models.TextField(help_text='Comma-separated city/district/area names matched against delivery address')
+    delivery_fee = models.DecimalField(max_digits=8, decimal_places=2, default=100)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f'{self.name} (৳{self.delivery_fee})'
 
 
 class Size(models.Model):

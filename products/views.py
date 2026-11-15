@@ -7,6 +7,10 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from django.core.cache import cache
 from rest_framework.response import Response
+from rest_framework.decorators import action
+from django.db.models import Sum, Count, Q
+from django.db import connection
+from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
 from drf_spectacular.utils import extend_schema
 
 # ─── Cache Key Helpers ────────────────────────────────────────────────────────
@@ -129,9 +133,41 @@ class ProductViewSet(viewsets.ModelViewSet):
     pagination_class = LimitOffsetPagination
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['category', 'brand', 'is_available']
-    search_fields = ['product_name', 'description']
+    search_fields = ['product_name', 'description', 'brand__brand_name', 'category__category_name']
     ordering_fields = ['product_name', 'price', 'created_at']
     ordering = ['-created_at']
+
+    def filter_queryset(self, queryset):
+        queryset = super().filter_queryset(queryset)
+        term = self.request.query_params.get('search', '').strip()
+        if term and connection.vendor == 'postgresql':
+            vector = SearchVector('product_name', weight='A') + SearchVector('description', weight='B') + SearchVector('brand__brand_name', weight='B') + SearchVector('category__category_name', weight='C')
+            query = SearchQuery(term, search_type='plain')
+            ranked = queryset.annotate(_search_vector=vector, _search_rank=SearchRank(vector, query)).filter(_search_vector=query).order_by('-_search_rank')
+            if ranked.exists():
+                return ranked
+        return queryset
+
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    def suggest(self, request):
+        query = request.query_params.get('q', '').strip()
+        if len(query) < 2:
+            return Response([])
+        rows = Product.objects.filter(is_available=True).filter(
+            Q(product_name__icontains=query) | Q(brand__brand_name__icontains=query) | Q(category__category_name__icontains=query)
+        ).values('id', 'product_name', 'slug')[:8]
+        return Response(list(rows))
+
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    def sections(self, request):
+        from orders.models import OrderItem
+        available = Product.objects.filter(is_available=True)
+        context = {'request': request}
+        return Response({
+            'featured': ProductListSerializer(available.filter(is_featured=True).order_by('-created_at')[:8], many=True, context=context).data,
+            'new_arrivals': ProductListSerializer(available.order_by('-created_at')[:8], many=True, context=context).data,
+            'best_sellers': ProductListSerializer(available.annotate(sold=Sum('orderitem__quantity')).filter(sold__gt=0).order_by('-sold')[:8], many=True, context=context).data,
+        })
     
     def get_serializer_class(self):
         if self.action == 'list':
@@ -147,22 +183,26 @@ class ProductViewSet(viewsets.ModelViewSet):
         # Cache key should reflect all query params for accurate caching
         params = request.query_params.urlencode()
         cache_key = _product_list_key(params)
-        cached = cache.get(cache_key)
+        has_scheduled_sales = Product.objects.filter(Q(sale_starts_at__isnull=False) | Q(sale_ends_at__isnull=False)).exists()
+        cached = None if has_scheduled_sales else cache.get(cache_key)
         if cached is not None:
             return Response(cached)
  
         response = super().list(request, *args, **kwargs)
-        cache.set(cache_key, response.data, timeout=PRODUCT_CACHE_TTL)
+        if not has_scheduled_sales:
+            cache.set(cache_key, response.data, timeout=PRODUCT_CACHE_TTL)
         return response
  
     def retrieve(self, request, *args, **kwargs):
         cache_key = _product_detail_key(kwargs.get('pk'))
-        cached = cache.get(cache_key)
+        has_scheduled_sales = Product.objects.filter(Q(sale_starts_at__isnull=False) | Q(sale_ends_at__isnull=False)).exists()
+        cached = None if has_scheduled_sales else cache.get(cache_key)
         if cached is not None:
             return Response(cached)
  
         response = super().retrieve(request, *args, **kwargs)
-        cache.set(cache_key, response.data, timeout=PRODUCT_CACHE_TTL)
+        if not has_scheduled_sales:
+            cache.set(cache_key, response.data, timeout=PRODUCT_CACHE_TTL)
         return response
  
     def _invalidate_product_cache(self, pk=None, slug=None):
@@ -273,6 +313,18 @@ class WishlistViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         item, created = WishlistItem.objects.get_or_create(user=request.user, product=serializer.validated_data['product'])
         return Response(self.get_serializer(item).data, status=201 if created else 200)
+
+
+@extend_schema(tags=['Delivery zones'])
+class DeliveryZoneViewSet(viewsets.ModelViewSet):
+    serializer_class = DeliveryZoneSerializer
+
+    def get_queryset(self):
+        qs = DeliveryZone.objects.all()
+        return qs if self.request.user.is_staff else qs.filter(is_active=True)
+
+    def get_permissions(self):
+        return [AllowAny()] if self.action in ['list', 'retrieve'] else [IsAdminUser()]
  
 @extend_schema(tags=["Products - Sizes"])
 class SizeViewSet(viewsets.ReadOnlyModelViewSet):

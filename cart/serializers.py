@@ -37,7 +37,7 @@ class CartItemSerializer(serializers.ModelSerializer):
         read_only_fields = ['cart', 'created_at', 'updated_at']
     
     def get_subtotal(self, obj):
-        price = obj.product.discount_price if obj.product.discount_price and obj.product.discount_price > 0 else obj.product.price
+        price = obj.product.current_price
         return float(price * obj.quantity)
     
     def validate(self, data):
@@ -79,6 +79,6 @@ class CartSerializer(serializers.ModelSerializer):
     def get_total_amount(self, obj):
         total = 0
         for item in obj.items.all():
-            price = item.product.discount_price if item.product.discount_price and item.product.discount_price > 0 else item.product.price
+            price = item.product.current_price
             total += price * item.quantity
         return float(total)

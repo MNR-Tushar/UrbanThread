@@ -18,7 +18,7 @@ class BrandAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('id','product_name', 'price', 'discount_price', 'is_available', 'category', 'brand')
+    list_display = ('id','product_name', 'price', 'discount_price', 'sale_starts_at', 'sale_ends_at', 'is_featured', 'is_available', 'category', 'brand')
     list_filter = ('category', 'brand')
     search_fields = ('product_name', 'description')
     ordering = ('-created_at',)
@@ -43,3 +43,8 @@ class ColorAdmin(admin.ModelAdmin):
 class SizeAdmin(admin.ModelAdmin):
     list_display = ('id','size_type', 'created_at')
     ordering = ('-created_at',)
+
+
+admin.site.register(StoreBanner)
+admin.site.register(StoreSettings)
+admin.site.register(DeliveryZone)

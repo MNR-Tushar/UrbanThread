@@ -31,6 +31,9 @@ class Order(models.Model):
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='unpaid')
     order_status = models.CharField(max_length=20, choices=ORDER_STATUS_CHOICES, default='pending')
     shipping_address = models.JSONField(null=True, blank=True)
+    courier_name = models.CharField(max_length=80, blank=True)
+    courier_tracking_id = models.CharField(max_length=120, blank=True)
+    courier_tracking_url = models.URLField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
