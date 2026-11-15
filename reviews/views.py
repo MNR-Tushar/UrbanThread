@@ -1,10 +1,12 @@
 from rest_framework import viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.core.cache import cache
 from django.db.models import Q
 from rest_framework.permissions import BasePermission
+from rest_framework.response import Response
 
-from .models import Review
+from .models import Review, ReviewHelpfulVote
 from .serializers import ReviewSerializer
 
 
@@ -35,7 +37,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
 
     def get_queryset(self):
-        queryset = Review.objects.select_related('user', 'product').all()
+        queryset = Review.objects.select_related('user', 'product').prefetch_related('images', 'helpful_votes').all()
         if not self.request.user.is_staff:
             if self.request.user.is_authenticated:
                 queryset = queryset.filter(Q(is_approved=True) | Q(user=self.request.user))
@@ -97,7 +99,13 @@ class ReviewViewSet(viewsets.ModelViewSet):
                 cache.delete(_review_detail_key(pk, False, user_id))
 
     def perform_create(self, serializer):
-        instance = serializer.save(user=self.request.user, is_approved=False)
+        from orders.models import OrderItem
+        product = serializer.validated_data['product']
+        verified = OrderItem.objects.filter(order__user=self.request.user, product=product, order__order_status__in=['delivered', 'completed']).exists()
+        if not verified:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'product': 'A delivered purchase is required before reviewing this product.'})
+        instance = serializer.save(user=self.request.user, is_approved=False, verified_purchase=True)
         self._invalidate_review_cache(product_id=instance.product_id, user_id=instance.user_id)
 
     def perform_update(self, serializer):
@@ -107,6 +115,15 @@ class ReviewViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         self._invalidate_review_cache(product_id=instance.product_id, pk=instance.pk, user_id=instance.user_id)
         instance.delete()
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def helpful(self, request, pk=None):
+        review = self.get_object()
+        if review.user_id == request.user.id:
+            return Response({'detail': 'You cannot vote on your own review.'}, status=400)
+        ReviewHelpfulVote.objects.get_or_create(review=review, user=request.user)
+        self._invalidate_review_cache(product_id=review.product_id, pk=review.pk)
+        return Response({'helpful_count': review.helpful_votes.count(), 'user_found_helpful': True})
 
 
 # ─── Helper ───────────────────────────────────────────────────────────────────

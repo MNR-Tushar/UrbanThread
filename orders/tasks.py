@@ -22,7 +22,8 @@ def send_order_invoice_email(order_id: int) -> str:
     except Order.DoesNotExist:
         return f"skipped: order {order_id} not found"
 
-    customer_name = order.user.first_name or order.user.username or "Customer"
+    customer_name = order.customer_name or (order.user.first_name or order.user.username if order.user else "Customer")
+    recipient = order.customer_email or (order.user.email if order.user else '')
     item_lines = [
         f"- {item.product.product_name} x{item.quantity} @ {item.price}"
         for item in order.items.all()
@@ -42,11 +43,12 @@ def send_order_invoice_email(order_id: int) -> str:
         subject=f"Invoice - {order.order_number}",
         body=body,
         from_email=settings.DEFAULT_FROM_EMAIL,
-        to=[order.user.email],
+        to=[recipient],
     )
     from .invoices import invoice_pdf
     msg.attach(f'{order.order_number}.pdf', invoice_pdf(order), 'application/pdf')
-    msg.send(fail_silently=False)
+    if recipient:
+        msg.send(fail_silently=False)
     return f"invoice_sent:{order.order_number}"
 
 
@@ -60,7 +62,7 @@ def send_order_status_email(order_id: int) -> str:
         subject=f"Order update - {order.order_number}",
         body=f"Your order {order.order_number} is now {order.order_status}. Courier: {order.courier_name or 'Pending'}. Tracking ID: {order.courier_tracking_id or 'Pending'}.",
         from_email=settings.DEFAULT_FROM_EMAIL,
-        to=[order.user.email],
+        to=[order.customer_email or (order.user.email if order.user else '')],
     )
     msg.send(fail_silently=False)
     return f"status_email_sent:{order.order_number}"
@@ -178,7 +180,7 @@ def generate_sales_report(start_date: str = "", end_date: str = "", fmt: str = "
             pdf.drawString(40, y, f"Sales Report: {start_date} to {end_date}")
             y -= 30
             for order in orders[:300]:
-                line = f"{order.order_number} | {order.user.email} | {order.total_amount} | {order.order_status}"
+                line = f"{order.order_number} | {order.customer_email or (order.user.email if order.user else '')} | {order.total_amount} | {order.order_status}"
                 pdf.drawString(40, y, line[:110])
                 y -= 18
                 if y < 60:
@@ -196,7 +198,7 @@ def generate_sales_report(start_date: str = "", end_date: str = "", fmt: str = "
         for order in orders:
             writer.writerow([
                 order.order_number,
-                order.user.email,
+                order.customer_email or (order.user.email if order.user else ''),
                 str(order.total_amount),
                 order.payment_status,
                 order.order_status,

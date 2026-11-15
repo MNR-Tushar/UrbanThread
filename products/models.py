@@ -48,6 +48,8 @@ class Product(models.Model):
     sale_starts_at = models.DateTimeField(null=True, blank=True)
     sale_ends_at = models.DateTimeField(null=True, blank=True)
     is_featured = models.BooleanField(default=False)
+    average_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0)
+    review_count = models.PositiveIntegerField(default=0)
     is_available = models.BooleanField(default=True)
     slug = models.SlugField(max_length=150, blank=True, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)

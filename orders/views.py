@@ -49,6 +49,12 @@ class OrderViewSet(viewsets.GenericViewSet):
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_permissions(self):
+        if self.action in ['create_order', 'retrieve', 'invoice']:
+            from rest_framework.permissions import AllowAny
+            return [AllowAny()]
+        return super().get_permissions()
+
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def admin_dashboard(self, request):
         if not request.user.is_staff and not request.user.is_superuser:
@@ -131,7 +137,10 @@ class OrderViewSet(viewsets.GenericViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        return Order.objects.filter(user=user).order_by('-created_at')
+        if user.is_authenticated:
+            return Order.objects.filter(user=user).order_by('-created_at')
+        guest_token = self.request.headers.get('X-Guest-Cart', '')
+        return Order.objects.filter(guest_token=guest_token).order_by('-created_at') if guest_token else Order.objects.none()
 
     def retrieve(self, request, pk=None):
         order = self.get_queryset().filter(pk=pk).first()
@@ -146,24 +155,32 @@ class OrderViewSet(viewsets.GenericViewSet):
         description="Create an order from the authenticated user's cart."
     )
     def create_order(self, request):
-        serializer = OrderCreateSerializer(data=request.data)
+        serializer = OrderCreateSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
 
-        address_id = serializer.validated_data['address_id']
+        address_id = serializer.validated_data.get('address_id')
         payment_method = serializer.validated_data['payment_method']
         coupon_code = serializer.validated_data.get('coupon_code', '')
 
-        user = request.user
-
-        try:
-            address = Address.objects.get(id=address_id, user=user)
-        except Address.DoesNotExist:
-            return Response({'error': 'Address not found'}, status=status.HTTP_404_NOT_FOUND)
+        user = request.user if request.user.is_authenticated else None
+        if user:
+            try:
+                saved_address = Address.objects.get(id=address_id, user=user)
+                address = {'full_name': saved_address.full_name, 'phone': saved_address.phone, 'city': saved_address.city, 'state': saved_address.state, 'pincode': saved_address.pincode, 'address': saved_address.address}
+            except Address.DoesNotExist:
+                return Response({'error': 'Address not found'}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            data = serializer.validated_data
+            address = {'full_name': data['guest_name'], 'phone': data['guest_phone'], 'city': data['city'], 'state': data['state'], 'pincode': data['pincode'], 'address': data['address']}
+        guest_token = request.headers.get('X-Guest-Cart', '') if user is None else ''
+        if user is None and not guest_token:
+            return Response({'error': 'Guest cart token is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             with transaction.atomic():
                 try:
-                    cart = Cart.objects.select_for_update().get(user=user)
+                    cart_filter = {'user': user} if user else {'guest_token': guest_token}
+                    cart = Cart.objects.select_for_update().get(**cart_filter)
                 except Cart.DoesNotExist:
                     return Response({'error': 'Cart not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -191,9 +208,10 @@ class OrderViewSet(viewsets.GenericViewSet):
                         pass
 
                 settings_row = StoreSettings.objects.order_by('id').first()
-                city = (address.city or '').strip().lower()
-                area = (address.state or '').strip().lower()
-                address_text = f'{city} {area} {(address.address or "").lower()}'
+                city = (address['city'] or '').strip().lower()
+                area = (address['state'] or '').strip().lower()
+                street = (address.get('address') or '').lower()
+                address_text = f'{city} {area} {street}'
                 zone = next((z for z in DeliveryZone.objects.filter(is_active=True) for term in z.areas.split(',') if term.strip() and term.strip().lower() in address_text), None)
                 shipping_fee = zone.delivery_fee if zone else ((settings_row.dhaka_delivery_fee if settings_row else Decimal('70.00')) if city in ('dhaka', 'ঢাকা') else (settings_row.outside_delivery_fee if settings_row else Decimal('130.00')))
                 threshold = settings_row.free_shipping_threshold if settings_row else Decimal('2500.00')
@@ -206,16 +224,15 @@ class OrderViewSet(viewsets.GenericViewSet):
                 order = Order.objects.create(
                     order_number=order_number,
                     user=user,
+                    customer_name=address['full_name'],
+                    customer_email=(user.email if user else serializer.validated_data['guest_email']),
+                    guest_token=guest_token,
                     total_amount=total_amount,
                     shipping_fee=shipping_fee,
                     # FIX: use CharField values instead of booleans
                     payment_status='unpaid',
                     order_status='pending',
-                    shipping_address={
-                        'full_name': address.full_name, 'phone': address.phone,
-                        'city': address.city, 'state': address.state,
-                        'pincode': address.pincode, 'address': address.address,
-                    },
+                    shipping_address=address,
                 )
                 OrderStatusHistory.objects.create(order=order, status='pending', note='Order placed.')
 
@@ -258,7 +275,7 @@ class OrderViewSet(viewsets.GenericViewSet):
                 )
 
                 cart_items.delete()
-                transaction.on_commit(lambda: cache.delete(f"cart:{user.id}"))
+                transaction.on_commit(lambda: cache.delete(f"cart:{user.id if user else guest_token}"))
                 transaction.on_commit(lambda: _enqueue_task(send_order_invoice_email, order.id))
                 transaction.on_commit(lambda: _enqueue_task(sync_order_stock, order.id))
                 transaction.on_commit(lambda: _enqueue_task(push_order_analytics_event, order.id, "order_placed"))

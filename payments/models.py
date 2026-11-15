@@ -21,7 +21,7 @@ class Payment(models.Model):
         ('internet_banking', 'Internet Banking'),
     ]
 
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='payments')
+    user = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='payments')
     order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='payment')
     
     # Payment Details

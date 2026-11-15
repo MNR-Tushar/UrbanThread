@@ -33,7 +33,7 @@ class CouponViewset(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in ['validate_coupon']:
-            return [IsAuthenticated()]
+            return [AllowAny()]
         if self.action in ['list', 'retrieve']:
             return [AllowAny()]
         if self.action in ['list', 'retrieve', 'create', 'update', 'partial_update', 'destroy']:
@@ -95,7 +95,7 @@ class CouponViewset(viewsets.ModelViewSet):
 
     # ─── Validate Coupon ──────────────────────────────────────────────────────
 
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def validate_coupon(self, request):
         serializer = CouponValidationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

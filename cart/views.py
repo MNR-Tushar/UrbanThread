@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny
 from django.core.cache import cache
 from django.db import transaction
 from drf_spectacular.utils import extend_schema
@@ -20,8 +20,8 @@ from drf_spectacular.utils import extend_schema_view, extend_schema
 
 # ─── Cache Key Helpers ────────────────────────────────────────────────────────
 
-def _cart_key(user_id) -> str:
-    return f"cart:{user_id}"
+def _cart_key(user_id=None, guest_token=None) -> str:
+    return f"cart:{user_id if user_id is not None else guest_token}"
 
 
 CART_CACHE_TTL = 60 * 5  # 5 minutes
@@ -35,23 +35,34 @@ CART_CACHE_TTL = 60 * 5  # 5 minutes
 )
 class CartViewSet(viewsets.GenericViewSet):
     serializer_class = CartSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
+
+    def _cart_filter(self):
+        if self.request.user.is_authenticated:
+            return {'user': self.request.user}
+        token = self.request.headers.get('X-Guest-Cart', '')
+        if not token or len(token) > 64:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'guest_cart': 'A valid guest cart token is required.'})
+        return {'guest_token': token}
 
     def get_queryset(self):
-        return Cart.objects.filter(user=self.request.user)
+        return Cart.objects.filter(**self._cart_filter())
 
     def get_or_create_cart(self):
-        cart, _ = Cart.objects.get_or_create(user=self.request.user)
+        cart, _ = Cart.objects.get_or_create(**self._cart_filter())
         return cart
 
     def _invalidate_cart_cache(self):
-        cache.delete(_cart_key(self.request.user.id))
+        scope = self._cart_filter()
+        cache.delete(_cart_key(user_id=scope['user'].id) if 'user' in scope else _cart_key(guest_token=scope['guest_token']))
 
     # ─── My Cart ──────────────────────────────────────────────────────────────
 
     @action(detail=False, methods=['get'])
     def my_cart(self, request):
-        cache_key = _cart_key(request.user.id)
+        scope = self._cart_filter()
+        cache_key = _cart_key(user_id=scope['user'].id) if 'user' in scope else _cart_key(guest_token=scope['guest_token'])
         cached = cache.get(cache_key)
         if cached is not None:
             return Response(cached)
@@ -137,7 +148,7 @@ class CartViewSet(viewsets.GenericViewSet):
 
         with transaction.atomic():
             try:
-                cart_item = CartItem.objects.select_for_update().get(id=item_id, cart__user=request.user)
+                cart_item = CartItem.objects.select_for_update().get(id=item_id, cart__in=self.get_queryset())
             except CartItem.DoesNotExist:
                 return Response({'error': 'Cart item not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -176,7 +187,7 @@ class CartViewSet(viewsets.GenericViewSet):
         item_id = request_serializer.validated_data['item_id']
 
         try:
-            cart_item = CartItem.objects.get(id=item_id, cart__user=request.user)
+            cart_item = CartItem.objects.get(id=item_id, cart__in=self.get_queryset())
             cart_item.delete()
             self._invalidate_cart_cache()
             return Response({'message': 'Item removed from cart'}, status=status.HTTP_200_OK)

@@ -70,7 +70,7 @@ class ProductListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Product
-        fields = ['id', 'product_name', 'sku', 'description', 'price', 'discount_price', 'compare_at_price', 'sale_starts_at', 'sale_ends_at', 'is_featured', 'is_available', 'slug', 'created_at', 'updated_at', 'category', 'brand', 'images', 'current_price']
+        fields = ['id', 'product_name', 'sku', 'description', 'price', 'discount_price', 'compare_at_price', 'sale_starts_at', 'sale_ends_at', 'is_featured', 'average_rating', 'review_count', 'is_available', 'slug', 'created_at', 'updated_at', 'category', 'brand', 'images', 'current_price']
         read_only_fields = ('created_at', 'slug')
 
 
@@ -84,10 +84,10 @@ class ProductDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Product
-        fields = ['id', 'product_name', 'sku', 'description', 'price', 'discount_price', 'compare_at_price', 'sale_starts_at', 'sale_ends_at', 'is_featured',
+        fields = ['id', 'product_name', 'sku', 'description', 'price', 'discount_price', 'compare_at_price', 'sale_starts_at', 'sale_ends_at', 'is_featured', 'average_rating', 'review_count',
                   'is_available', 'slug', 'created_at', 'category', 'brand',
                   'images', 'category_id', 'brand_id','updated_at', 'current_price']
-        read_only_fields = ['slug', 'created_at']
+        read_only_fields = ['slug', 'created_at', 'average_rating', 'review_count']
 
     def create(self, validated_data):
         return Product.objects.create(**validated_data)

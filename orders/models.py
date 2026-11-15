@@ -24,7 +24,10 @@ class Order(models.Model):
     ]
 
     order_number = models.CharField(max_length=50)
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    user = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True)
+    customer_name = models.CharField(max_length=120, blank=True)
+    customer_email = models.EmailField(blank=True)
+    guest_token = models.CharField(max_length=64, blank=True, db_index=True)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     shipping_fee = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     # FIX: payment_status was BooleanField; now has clear states
@@ -60,3 +63,17 @@ class OrderStatusHistory(models.Model):
 
     class Meta:
         ordering = ['created_at', 'id']
+
+
+class ReturnRequest(models.Model):
+    STATUS_CHOICES = [('pending', 'Pending'), ('approved', 'Approved'), ('rejected', 'Rejected'), ('completed', 'Completed')]
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='return_requests')
+    user = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True)
+    reason = models.TextField(max_length=1200)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    admin_note = models.TextField(blank=True, max_length=1200)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']

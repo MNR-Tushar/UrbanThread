@@ -158,6 +158,14 @@ class ProductViewSet(viewsets.ModelViewSet):
         ).values('id', 'product_name', 'slug')[:8]
         return Response(list(rows))
 
+    @action(detail=True, methods=['get'], permission_classes=[AllowAny])
+    def related(self, request, slug=None):
+        product = self.get_object()
+        rows = Product.objects.filter(is_available=True).exclude(pk=product.pk).filter(
+            Q(category=product.category) | Q(brand=product.brand)
+        ).select_related('category', 'brand').prefetch_related('productimage_set').order_by('-is_featured', '-created_at')[:8]
+        return Response(ProductListSerializer(rows, many=True, context={'request': request}).data)
+
     @action(detail=False, methods=['get'], permission_classes=[AllowAny])
     def sections(self, request):
         from orders.models import OrderItem
