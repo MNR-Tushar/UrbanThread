@@ -3,6 +3,7 @@ from datetime import timedelta
 from pathlib import Path
 from decouple import config
 import dj_database_url
+import cloudinary
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -218,6 +219,22 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 AUTH_USER_MODEL = "accounts.CustomUser"
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Configure Cloudinary for every Django ImageField when credentials are present.
+# Keep local filesystem storage available for development without Cloudinary keys.
+CLOUDINARY_URL = config('CLOUDINARY_URL', default='').strip()
+if CLOUDINARY_URL:
+    # The SDK reads CLOUDINARY_URL from the environment; this also enforces HTTPS URLs.
+    cloudinary.config(secure=True)
+    STORAGES = {
+        'default': {'BACKEND': 'urbanthread.storage.CloudinaryMediaStorage'},
+        'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+    }
+else:
+    STORAGES = {
+        'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+        'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+    }
 
 
 # REST Framework Configuration
