@@ -35,6 +35,7 @@ def _color_list_key() -> str:
 
 
 PRODUCT_CACHE_TTL  = 60 * 15   # 15 minutes
+PRODUCT_SECTIONS_CACHE_TTL = 60 * 5  # 5 minutes; best-seller totals can change after orders
 CATEGORY_CACHE_TTL = 60 * 60   # 1 hour
 BRAND_CACHE_TTL    = 60 * 60   # 1 hour
 SIZE_COLOR_TTL     = 60 * 60 * 6  # 6 hours
@@ -127,7 +128,7 @@ class BrandViewset(viewsets.ModelViewSet):
         
 @extend_schema(tags=["Products"])
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.select_related('category', 'brand').all()
+    queryset = Product.objects.select_related('category', 'brand').prefetch_related('productimage_set').all()
     lookup_field = 'slug'
     permission_classes = [AllowAny]
     pagination_class = LimitOffsetPagination
@@ -168,14 +169,22 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], permission_classes=[AllowAny])
     def sections(self, request):
-        from orders.models import OrderItem
-        available = Product.objects.filter(is_available=True)
+        cache_key = 'product_sections'
+        has_scheduled_sales = Product.objects.filter(Q(sale_starts_at__isnull=False) | Q(sale_ends_at__isnull=False)).exists()
+        cached = None if has_scheduled_sales else cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
+        available = self.get_queryset().filter(is_available=True)
         context = {'request': request}
-        return Response({
+        data = {
             'featured': ProductListSerializer(available.filter(is_featured=True).order_by('-created_at')[:8], many=True, context=context).data,
             'new_arrivals': ProductListSerializer(available.order_by('-created_at')[:8], many=True, context=context).data,
             'best_sellers': ProductListSerializer(available.annotate(sold=Sum('orderitem__quantity')).filter(sold__gt=0).order_by('-sold')[:8], many=True, context=context).data,
-        })
+        }
+        if not has_scheduled_sales:
+            cache.set(cache_key, data, timeout=PRODUCT_SECTIONS_CACHE_TTL)
+        return Response(data)
     
     def get_serializer_class(self):
         if self.action == 'list':
@@ -214,6 +223,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         return response
  
     def _invalidate_product_cache(self, pk=None, slug=None):
+        cache.delete('product_sections')
         # Specific product cache delete
         if pk:
             cache.delete(_product_detail_key(pk))
@@ -251,7 +261,18 @@ class ProductImageViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         instance = serializer.save()
+        cache.delete('product_sections')
         # Invalidate cache for the associated product detail and list views
+        cache.delete(_product_detail_key(instance.productimg_id))
+        try:
+            cache.delete_pattern("*product_list:*")
+            cache.delete_pattern("*product_detail:*")
+        except AttributeError:
+            cache.clear()
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        cache.delete('product_sections')
         cache.delete(_product_detail_key(instance.productimg_id))
         try:
             cache.delete_pattern("*product_list:*")
@@ -262,6 +283,7 @@ class ProductImageViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         product_id = instance.productimg_id
         instance.delete()
+        cache.delete('product_sections')
         cache.delete(_product_detail_key(product_id))
         try:
             cache.delete_pattern("*product_list:*")
