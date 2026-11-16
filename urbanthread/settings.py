@@ -45,6 +45,8 @@ INSTALLED_APPS = [
     'payments',
     'inventory',
     'reviews',
+    'chatbot',
+    'management.apps.ManagementConfig',
     'drf_spectacular',
 ]
 
@@ -302,6 +304,7 @@ REST_FRAMEWORK = {
         'email_verification_request': '5/hour',
         'email_verification_confirm': '10/hour',
         'google_sign_in': '20/minute',
+        'chatbot': '20/minute',
     },
 }
 
@@ -397,6 +400,8 @@ SIMPLE_JWT = {
 
 # SSL Commerce Configuration
 SSLCOMMERZ_STORE_ID = config('SSLCOMMERZ_STORE_ID', default='')
+OPENAI_API_KEY = config('OPENAI_API_KEY', default='').strip()
+OPENAI_CHAT_MODEL = config('OPENAI_CHAT_MODEL', default='gpt-4o-mini').strip()
 SSLCOMMERZ_STORE_PASSWORD = config('SSLCOMMERZ_STORE_PASSWORD', default='')
 SSLCOMMERZ_IS_SANDBOX = config('SSLCOMMERZ_IS_SANDBOX', default=True, cast=bool)
 
