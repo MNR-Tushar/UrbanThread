@@ -211,7 +211,11 @@ class ProductViewSet(viewsets.ModelViewSet):
         return response
  
     def retrieve(self, request, *args, **kwargs):
-        cache_key = _product_detail_key(kwargs.get('pk'))
+        # The product route uses ``slug`` as its lookup field, so DRF passes
+        # that value in ``kwargs['slug']`` rather than ``kwargs['pk']``.
+        # Using pk here made every detail request share product_detail:None.
+        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
+        cache_key = _product_detail_key(kwargs.get(lookup_url_kwarg))
         has_scheduled_sales = Product.objects.filter(Q(sale_starts_at__isnull=False) | Q(sale_ends_at__isnull=False)).exists()
         cached = None if has_scheduled_sales else cache.get(cache_key)
         if cached is not None:
