@@ -111,28 +111,48 @@ def _store_context(message):
     }
 
 
-def _fallback_reply(message, context):
+def _prefers_bangla(message):
+    if re.search(r'[\u0980-\u09ff]', message):
+        return True
+    roman_bangla = {'ki', 'kivabe', 'korbo', 'korbo', 'chai', 'nibo', 'kinbo', 'apni', 'ase', 'ache', 'parbo'}
+    return bool(roman_bangla.intersection(re.findall(r'[a-z]+', message.lower())))
+
+
+def _fallback_reply(message, context, history=None):
     text = message.lower()
     has_product_link = bool(re.search(r'https?://\S+', message))
+    bangla = _prefers_bangla(message)
     if any(word in text for word in ('delivery', 'shipping', 'ডেলিভারি', 'কুরিয়ার', 'ঢাকা')):
-        if re.search(r'[\u0980-\u09ff]', message):
+        if bangla:
             return f"ডেলিভারি তথ্য: {context['delivery']} চূড়ান্ত ডেলিভারি চার্জ checkout-এ দেখতে পারবেন।"
         return f"Delivery information: {context['delivery']} The final delivery fee is shown at checkout."
     if any(word in text for word in ('return', 'refund', 'exchange', 'ফেরত', 'রিটার্ন')):
-        if re.search(r'[\u0980-\u09ff]', message):
+        if bangla:
             return 'আপনার অর্ডার ডেলিভার হওয়ার পর Returns পেজ থেকে return request পাঠাতে পারবেন। আমাদের team request পর্যালোচনা করবে; status My Orders পেজে দেখা যাবে।'
         return 'Once your order is delivered, submit a return request from the Returns page. Our team will review it, and you can follow its status in My Orders.'
     if any(word in text for word in ('track', 'order status', 'অর্ডার', 'tracking')):
-        if re.search(r'[\u0980-\u09ff]', message):
+        if bangla:
             return 'অর্ডারের বর্তমান অবস্থা দেখতে My Orders অথবা order tracking পেজ খুলুন। Guest order হলে checkout-এর confirmation link ব্যবহার করুন।'
         return 'To check your order status, open My Orders or your order tracking link. For a guest order, use the confirmation link from checkout.'
     if any(word in text for word in ('payment', 'pay', 'bkash', 'card', 'পেমেন্ট')):
-        if re.search(r'[\u0980-\u09ff]', message):
+        if bangla:
             return 'Checkout-এ দেখানো payment method থেকে পছন্দেরটি বেছে নিন। Payment history দেখতে sign in করে Payments পেজ খুলুন।'
         return 'Choose one of the payment methods shown at checkout. Sign in and open Payments to view your payment history.'
+    if any(term in text for term in ('order', 'buy', 'purchase', 'checkout', 'অর্ডার', 'কিনতে', 'নিতে', 'kinbo', 'nibo', 'kivabe', 'korbo')):
+        products, previous_reply = _products_from_history(history or [])
+        if products:
+            if len(products) == 1:
+                product = products[0]
+                product_url = f"{settings.FRONTEND_URL.rstrip('/')}/product/{product.slug}"
+                if bangla:
+                    return f"অর্ডার করতে {product.product_name} পেজে গিয়ে size/color ও quantity বেছে ‘Add to cart’ চাপুন। এরপর Cart থেকে delivery details দিয়ে ‘Place order’ করুন।\n{product_url}"
+                return f"To order {product.product_name}, choose your size/color and quantity on its page, then select ‘Add to cart’. In your cart, enter delivery details and choose ‘Place order’.\n{product_url}"
+            return _purchase_follow_up(products, message, previous_reply)
+        if bangla:
+            return "অর্ডার করতে পছন্দের product page খুলে size/color ও quantity বেছে ‘Add to cart’ চাপুন। তারপর Cart-এ delivery details দিয়ে ‘Place order’ করুন।"
+        return "To order, open a product page, choose the size/color and quantity, then select ‘Add to cart’. In your cart, enter delivery details and choose ‘Place order’."
     if has_product_link or any(word in text for word in ('product', 'shirt', 'dress', 'pants', 'bra', 'price', 'available', 'stock', 'পণ্য', 'দাম')):
         products = context['matching_products']
-        bangla = bool(re.search(r'[\u0980-\u09ff]', message))
         if not products:
             if bangla:
                 return 'দুঃখিত, এই পণ্যটি UrbanThread-এর catalog-এ খুঁজে পেলাম না। পণ্যের সঠিক নাম বা link পাঠালে আবার খুঁজে দেখব।'
@@ -152,7 +172,7 @@ def _fallback_reply(message, context):
             return 'আপনার প্রশ্নের সঙ্গে মেলে এমন পণ্যগুলো:\n' + '\n'.join(lines)
         lines = [f"• {p['name']} — ৳{p['price_bdt']} ({'available' if p['available'] else 'unavailable'})\n  {p['url']}" for p in products]
         return 'Here are a few products that may match:\n' + '\n'.join(lines)
-    if re.search(r'[\u0980-\u09ff]', message):
+    if bangla:
         return 'UrbanThread-এর পণ্য, ডেলিভারি, payment, order tracking ও return বিষয়ে আমি সাহায্য করতে পারি। কী জানতে চান?'
     return 'I can help with UrbanThread products, delivery, payments, order tracking, and returns. What would you like to know?'
 
@@ -217,7 +237,7 @@ class ChatView(APIView):
         context = _store_context(message)
 
         if not settings.OPENAI_API_KEY:
-            return Response({'reply': _fallback_reply(message, context)})
+            return Response({'reply': _fallback_reply(message, context, history)})
 
         safe_history = [
             {'role': row['role'], 'content': row['content'][:1000]}
@@ -242,10 +262,10 @@ class ChatView(APIView):
             )
             response.raise_for_status()
             reply = response.json()['choices'][0]['message']['content'].strip()
-            return Response({'reply': reply or _fallback_reply(message, context)})
+            return Response({'reply': reply or _fallback_reply(message, context, history)})
         except (requests.RequestException, KeyError, IndexError, TypeError):
             logger.exception('UrbanThread chatbot provider request failed')
             return Response(
-                {'reply': _fallback_reply(message, context), 'fallback': True},
+                {'reply': _fallback_reply(message, context, history), 'fallback': True},
                 status=status.HTTP_200_OK,
             )
