@@ -134,7 +134,7 @@ class ProductViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['category', 'brand', 'is_available']
     search_fields = ['product_name', 'description', 'brand__brand_name', 'category__category_name']
-    ordering_fields = ['product_name', 'price', 'created_at']
+    ordering_fields = ['product_name', 'price', 'created_at', 'is_featured']
     ordering = ['-created_at']
 
     def filter_queryset(self, queryset):
