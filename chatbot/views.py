@@ -263,8 +263,20 @@ class ChatView(APIView):
             response.raise_for_status()
             reply = response.json()['choices'][0]['message']['content'].strip()
             return Response({'reply': reply or _fallback_reply(message, context, history)})
-        except (requests.RequestException, KeyError, IndexError, TypeError):
-            logger.exception('UrbanThread chatbot provider request failed')
+        except requests.RequestException as exc:
+            detail = ''
+            if hasattr(exc, 'response') and exc.response is not None:
+                try:
+                    detail = exc.response.text[:500]
+                except Exception:
+                    pass
+            logger.exception('UrbanThread chatbot OpenAI request failed: %s', detail)
+            return Response(
+                {'reply': _fallback_reply(message, context, history), 'fallback': True},
+                status=status.HTTP_200_OK,
+            )
+        except (KeyError, IndexError, TypeError):
+            logger.exception('UrbanThread chatbot response parsing failed')
             return Response(
                 {'reply': _fallback_reply(message, context, history), 'fallback': True},
                 status=status.HTTP_200_OK,

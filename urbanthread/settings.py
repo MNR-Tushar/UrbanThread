@@ -406,7 +406,8 @@ SSLCOMMERZ_STORE_PASSWORD = config('SSLCOMMERZ_STORE_PASSWORD', default='')
 SSLCOMMERZ_IS_SANDBOX = config('SSLCOMMERZ_IS_SANDBOX', default=True, cast=bool)
 
 # Frontend URL for payment redirects
-FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
+_raw_frontend_url = config('FRONTEND_URL', default='http://localhost:5173')
+FRONTEND_URL = _raw_frontend_url.split(',')[0].strip().rstrip('/')
 BACKEND_PUBLIC_URL = config('BACKEND_PUBLIC_URL', default='')
 
 # Email Configuration
