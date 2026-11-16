@@ -1,4 +1,6 @@
 import logging
+import re
+from urllib.parse import unquote, urlparse
 
 import requests
 from django.conf import settings
@@ -26,16 +28,50 @@ class ChatSerializer(serializers.Serializer):
 
 
 def _store_context(message):
-    products = Product.objects.filter(is_available=True).select_related('category', 'brand')
-    words = [word for word in message.split() if len(word) > 2]
-    if words:
-        query = Q()
-        for word in words[:8]:
-            query |= Q(product_name__icontains=word) | Q(description__icontains=word) | Q(category__category_name__icontains=word) | Q(brand__brand_name__icontains=word)
-        products = products.filter(query)
-    products = products.order_by('-is_featured', '-updated_at')[:8]
+    product_query = Product.objects.select_related('category', 'brand')
+    url_match = re.search(r'https?://[^\s]+', message)
+    slug = ''
+    if url_match:
+        path = urlparse(url_match.group(0).rstrip('.,!?)]}')).path.rstrip('/')
+        slug = unquote(path.split('/')[-1]).lower()
+
+    products = []
+    if slug:
+        exact = product_query.filter(slug__iexact=slug).first()
+        if exact:
+            products = [exact]
+
+    if not products:
+        stop_words = {
+            'the', 'and', 'for', 'with', 'this', 'that', 'product', 'item',
+            'price', 'available', 'availability', 'stock', 'please', 'what',
+            'is', 'are', 'it', 'ai', 'asa', 'ache', 'ase', 'assa', 'er',
+            'app', 'vercel', 'urbanthreadshop',
+        }
+        search_text = slug.replace('-', ' ') if slug else message.lower()
+        words = [
+            word for word in re.findall(r'[a-z0-9]+', search_text)
+            if len(word) > 1 and word not in stop_words
+        ]
+        # URL paths contain the exact product slug, so use its words even if
+        # the rest of the customer's message is in Bangla.
+        if slug:
+            words.extend(word for word in slug.split('-') if len(word) > 1)
+        words = list(dict.fromkeys(words))[:10]
+        if words:
+            query = Q()
+            for word in words:
+                query |= (
+                    Q(product_name__icontains=word)
+                    | Q(slug__icontains=word)
+                    | Q(description__icontains=word)
+                    | Q(category__category_name__icontains=word)
+                    | Q(brand__brand_name__icontains=word)
+                )
+            products = list(product_query.filter(query).order_by('-is_featured', '-updated_at')[:8])
+
     catalog = [
-        f"{p.product_name} ({p.category.category_name}, {p.brand.brand_name}) — ৳{p.current_price}; {'in stock' if p.is_available else 'unavailable'}"
+        f"{p.product_name} (brand: {p.brand.brand_name}, category: {p.category.category_name}) — ৳{p.current_price}; {'available' if p.is_available else 'unavailable'}; product URL: {settings.FRONTEND_URL.rstrip('/')}/product/{p.slug}"
         for p in products
     ]
     store = StoreSettings.objects.first()
@@ -54,6 +90,7 @@ def _store_context(message):
 
 def _fallback_reply(message, context):
     text = message.lower()
+    has_product_link = bool(re.search(r'https?://\S+', message))
     if any(word in text for word in ('delivery', 'shipping', 'ডেলিভারি', 'কুরিয়ার', 'ঢাকা')):
         return f"Delivery information: {context.split('Delivery: ', 1)[1].split(chr(10), 1)[0]} You can see the final fee at checkout."
     if any(word in text for word in ('return', 'refund', 'exchange', 'ফেরত', 'রিটার্ন')):
@@ -62,8 +99,11 @@ def _fallback_reply(message, context):
         return 'আপনার order status দেখতে My Orders বা order tracking page খুলুন। Guest order হলে checkout-এর confirmation link ব্যবহার করুন।'
     if any(word in text for word in ('payment', 'pay', 'bkash', 'card', 'পেমেন্ট')):
         return 'Checkout-এ উপলভ্য payment method বেছে নিন। Payment history দেখতে sign in করে Payments page খুলুন।'
-    if any(word in text for word in ('product', 'shirt', 'dress', 'price', 'available', 'stock', 'পণ্য', 'দাম')):
-        return 'আপনার product প্রশ্নের জন্য catalog থেকে যা পাওয়া গেছে: ' + context.split('Matching catalog items: ', 1)[1]
+    if has_product_link or any(word in text for word in ('product', 'shirt', 'dress', 'pants', 'bra', 'price', 'available', 'stock', 'পণ্য', 'দাম')):
+        matches = context.split('Matching catalog items: ', 1)[1]
+        if matches == 'No matching products found.':
+            return 'এই product-টি UrbanThread catalog-এ খুঁজে পাচ্ছি না। Product name বা link-টি আবার মিলিয়ে পাঠাবেন? You can also browse all products on the store page.'
+        return 'Catalog-এ যা পেয়েছি: ' + matches
     return 'আমি UrbanThread-এর product, price, delivery, payment, order tracking এবং return বিষয়ে সাহায্য করতে পারি। নির্দিষ্ট প্রশ্নটি আরেকটু বিস্তারিত লিখুন।'
 
 
