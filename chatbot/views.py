@@ -1,6 +1,7 @@
 import logging
 import json
 import re
+import time
 from urllib.parse import unquote, urlparse
 
 import requests
@@ -238,22 +239,103 @@ SYSTEM_PROMPT = (
 )
 
 
-def _get_provider_config():
-    """Return (api_url, api_key, model) based on the configured chatbot provider."""
-    provider = getattr(settings, 'CHATBOT_PROVIDER', 'gemini')
-    if provider == 'gemini' and getattr(settings, 'GEMINI_API_KEY', ''):
-        return (
-            'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-            settings.GEMINI_API_KEY,
-            getattr(settings, 'GEMINI_CHAT_MODEL', 'gemini-3.8-flash'),
-        )
-    if getattr(settings, 'OPENAI_API_KEY', ''):
-        return (
-            'https://api.openai.com/v1/chat/completions',
-            settings.OPENAI_API_KEY,
-            getattr(settings, 'OPENAI_CHAT_MODEL', 'gpt-4o-mini'),
-        )
-    return None, None, None
+def _call_gemini_native(api_key, preferred_model, system_content, safe_history, message):
+    """Directly call Google Gemini's native generateContent endpoint with retries and model fallbacks."""
+    models_to_try = [preferred_model]
+    for fallback in ('gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'):
+        if fallback and fallback not in models_to_try:
+            models_to_try.append(fallback)
+
+    raw_contents = []
+    for entry in safe_history:
+        role = 'user' if entry.get('role') == 'user' else 'model'
+        text = str(entry.get('content', '')).strip()
+        if text:
+            raw_contents.append({'role': role, 'parts': [{'text': text}]})
+
+    raw_contents.append({'role': 'user', 'parts': [{'text': message}]})
+
+    # Gemini requires alternating roles and the first role must be 'user'
+    merged_contents = []
+    for item in raw_contents:
+        if merged_contents and merged_contents[-1]['role'] == item['role']:
+            merged_contents[-1]['parts'][0]['text'] += '\n' + item['parts'][0]['text']
+        else:
+            merged_contents.append(item)
+
+    while merged_contents and merged_contents[0]['role'] != 'user':
+        merged_contents.pop(0)
+
+    if not merged_contents:
+        merged_contents = [{'role': 'user', 'parts': [{'text': message}]}]
+
+    payload = {
+        'system_instruction': {
+            'parts': [{'text': system_content}]
+        },
+        'contents': merged_contents,
+        'generationConfig': {
+            'temperature': 0.3,
+            'maxOutputTokens': 350,
+        },
+    }
+
+    last_error = None
+    for attempt_model in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{attempt_model}:generateContent"
+        for retry in range(2):
+            try:
+                resp = requests.post(
+                    url,
+                    params={'key': api_key},
+                    json=payload,
+                    timeout=20,
+                )
+                if resp.status_code in (500, 503, 429):
+                    time.sleep(1.0)
+                    continue
+
+                resp.raise_for_status()
+                data = resp.json()
+                candidates = data.get('candidates') or []
+                if candidates:
+                    parts = candidates[0].get('content', {}).get('parts', [])
+                    if parts and 'text' in parts[0]:
+                        return parts[0]['text'].strip()
+            except requests.RequestException as e:
+                last_error = e
+                status_code = getattr(getattr(e, 'response', None), 'status_code', None)
+                if status_code in (400, 404):
+                    break
+                time.sleep(1.0)
+            except Exception as e:
+                last_error = e
+                break
+
+    if last_error:
+        raise last_error
+    return None
+
+
+def _call_openai(api_key, model, system_content, safe_history, message):
+    """Call OpenAI's chat completions endpoint."""
+    response = requests.post(
+        'https://api.openai.com/v1/chat/completions',
+        headers={'Authorization': f'Bearer {api_key}'},
+        json={
+            'model': model,
+            'messages': [
+                {'role': 'system', 'content': system_content},
+                *safe_history,
+                {'role': 'user', 'content': message},
+            ],
+            'temperature': 0.3,
+            'max_tokens': 300,
+        },
+        timeout=20,
+    )
+    response.raise_for_status()
+    return response.json()['choices'][0]['message']['content'].strip()
 
 
 class ChatView(APIView):
@@ -272,50 +354,51 @@ class ChatView(APIView):
 
         context = _store_context(message)
 
-        api_url, api_key, model = _get_provider_config()
-        if not api_key:
-            return Response({'reply': _fallback_reply(message, context, history)})
-
         safe_history = [
             {'role': row['role'], 'content': row['content'][:1000]}
             for row in history
             if row.get('role') in ('user', 'assistant') and isinstance(row.get('content'), str)
         ]
         system_content = SYSTEM_PROMPT + "\n\nStore data:\n" + json.dumps(context, ensure_ascii=False)
-        try:
-            response = requests.post(
-                api_url,
-                headers={'Authorization': f'Bearer {api_key}'},
-                json={
-                    'model': model,
-                    'messages': [
-                        {'role': 'system', 'content': system_content},
-                        *safe_history,
-                        {'role': 'user', 'content': message},
-                    ],
-                    'temperature': 0.3,
-                    'max_tokens': 300,
-                },
-                timeout=20,
-            )
-            response.raise_for_status()
-            reply = response.json()['choices'][0]['message']['content'].strip()
-            return Response({'reply': reply or _fallback_reply(message, context, history)})
-        except requests.RequestException as exc:
-            detail = ''
-            if hasattr(exc, 'response') and exc.response is not None:
-                try:
-                    detail = exc.response.text[:500]
-                except Exception:
-                    pass
-            logger.exception('UrbanThread chatbot %s request failed: %s', api_url, detail)
-            return Response(
-                {'reply': _fallback_reply(message, context, history), 'fallback': True},
-                status=status.HTTP_200_OK,
-            )
-        except (KeyError, IndexError, TypeError):
-            logger.exception('UrbanThread chatbot response parsing failed')
-            return Response(
-                {'reply': _fallback_reply(message, context, history), 'fallback': True},
-                status=status.HTTP_200_OK,
-            )
+
+        provider = getattr(settings, 'CHATBOT_PROVIDER', 'gemini').lower()
+        gemini_key = getattr(settings, 'GEMINI_API_KEY', '').strip()
+        openai_key = getattr(settings, 'OPENAI_API_KEY', '').strip()
+
+        reply = None
+
+        if provider == 'gemini' and gemini_key:
+            try:
+                preferred_model = getattr(settings, 'GEMINI_CHAT_MODEL', 'gemini-3.8-flash').strip()
+                reply = _call_gemini_native(gemini_key, preferred_model, system_content, safe_history, message)
+            except Exception as exc:
+                logger.warning('Gemini native request failed: %s', exc)
+                # Attempt fallback to OpenAI if a key exists
+                if openai_key:
+                    try:
+                        reply = _call_openai(
+                            openai_key,
+                            getattr(settings, 'OPENAI_CHAT_MODEL', 'gpt-4o-mini').strip(),
+                            system_content,
+                            safe_history,
+                            message,
+                        )
+                    except Exception:
+                        pass
+        elif openai_key:
+            try:
+                reply = _call_openai(
+                    openai_key,
+                    getattr(settings, 'OPENAI_CHAT_MODEL', 'gpt-4o-mini').strip(),
+                    system_content,
+                    safe_history,
+                    message,
+                )
+            except Exception as exc:
+                logger.warning('OpenAI request failed: %s', exc)
+
+        if not reply:
+            reply = _fallback_reply(message, context, history)
+            return Response({'reply': reply, 'fallback': True}, status=status.HTTP_200_OK)
+
+        return Response({'reply': reply}, status=status.HTTP_200_OK)
