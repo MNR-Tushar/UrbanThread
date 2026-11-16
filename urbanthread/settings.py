@@ -405,7 +405,7 @@ OPENAI_CHAT_MODEL = config('OPENAI_CHAT_MODEL', default='gpt-4o-mini').strip()
 
 # Google Gemini API (free tier) — used as primary chatbot provider
 GEMINI_API_KEY = config('GEMINI_API_KEY', default='').strip()
-GEMINI_CHAT_MODEL = config('GEMINI_CHAT_MODEL', default='gemini-2.0-flash').strip()
+GEMINI_CHAT_MODEL = config('GEMINI_CHAT_MODEL', default='gemini-3.8-flash').strip()
 
 # Which chatbot provider to use: 'gemini' (free) or 'openai'
 CHATBOT_PROVIDER = config('CHATBOT_PROVIDER', default='gemini').strip().lower()

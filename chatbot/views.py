@@ -245,7 +245,7 @@ def _get_provider_config():
         return (
             'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
             settings.GEMINI_API_KEY,
-            getattr(settings, 'GEMINI_CHAT_MODEL', 'gemini-2.0-flash'),
+            getattr(settings, 'GEMINI_CHAT_MODEL', 'gemini-3.8-flash'),
         )
     if getattr(settings, 'OPENAI_API_KEY', ''):
         return (
