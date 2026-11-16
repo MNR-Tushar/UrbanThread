@@ -402,6 +402,13 @@ SIMPLE_JWT = {
 SSLCOMMERZ_STORE_ID = config('SSLCOMMERZ_STORE_ID', default='')
 OPENAI_API_KEY = config('OPENAI_API_KEY', default='').strip()
 OPENAI_CHAT_MODEL = config('OPENAI_CHAT_MODEL', default='gpt-4o-mini').strip()
+
+# Google Gemini API (free tier) — used as primary chatbot provider
+GEMINI_API_KEY = config('GEMINI_API_KEY', default='').strip()
+GEMINI_CHAT_MODEL = config('GEMINI_CHAT_MODEL', default='gemini-2.0-flash').strip()
+
+# Which chatbot provider to use: 'gemini' (free) or 'openai'
+CHATBOT_PROVIDER = config('CHATBOT_PROVIDER', default='gemini').strip().lower()
 SSLCOMMERZ_STORE_PASSWORD = config('SSLCOMMERZ_STORE_PASSWORD', default='')
 SSLCOMMERZ_IS_SANDBOX = config('SSLCOMMERZ_IS_SANDBOX', default=True, cast=bool)
 

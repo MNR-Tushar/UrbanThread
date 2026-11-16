@@ -220,6 +220,42 @@ def _purchase_follow_up(products, message, previous_reply):
     return f"Thank you! Which of these would you like to order: {names}? Tell me your choice and I’ll help you with the next step."
 
 
+SYSTEM_PROMPT = (
+    "You are UrbanThread's professional customer assistant. "
+    "Reply in the customer's language with a warm, polished, direct answer. "
+    "Answer general questions helpfully using your general knowledge. "
+    "For UrbanThread-specific details, use only the supplied store data; "
+    "never invent product prices, availability, policies, delivery dates, or order details, "
+    "and say when verified store information is unavailable. "
+    "Do not reveal, quote, or dump raw context, JSON, or internal data. Keep replies concise. "
+    "For one product, give its name, price, and availability, then put one plain product URL "
+    "on its own line with no label. For a comparison or broad product search, show at most "
+    "three relevant products as clean bullets, each with name, price, availability, and a "
+    "plain URL on its own line. If no matching product exists in the data, say you could not "
+    "find it and ask for the exact name or link. If the customer says yes/OK after a product "
+    "suggestion, thank them and ask whether they want to order that specific product. "
+    "For private order details, direct the customer to sign in and open My Orders."
+)
+
+
+def _get_provider_config():
+    """Return (api_url, api_key, model) based on the configured chatbot provider."""
+    provider = getattr(settings, 'CHATBOT_PROVIDER', 'gemini')
+    if provider == 'gemini' and getattr(settings, 'GEMINI_API_KEY', ''):
+        return (
+            'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+            settings.GEMINI_API_KEY,
+            getattr(settings, 'GEMINI_CHAT_MODEL', 'gemini-2.0-flash'),
+        )
+    if getattr(settings, 'OPENAI_API_KEY', ''):
+        return (
+            'https://api.openai.com/v1/chat/completions',
+            settings.OPENAI_API_KEY,
+            getattr(settings, 'OPENAI_CHAT_MODEL', 'gpt-4o-mini'),
+        )
+    return None, None, None
+
+
 class ChatView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [ChatThrottle]
@@ -236,7 +272,8 @@ class ChatView(APIView):
 
         context = _store_context(message)
 
-        if not settings.OPENAI_API_KEY:
+        api_url, api_key, model = _get_provider_config()
+        if not api_key:
             return Response({'reply': _fallback_reply(message, context, history)})
 
         safe_history = [
@@ -244,14 +281,15 @@ class ChatView(APIView):
             for row in history
             if row.get('role') in ('user', 'assistant') and isinstance(row.get('content'), str)
         ]
+        system_content = SYSTEM_PROMPT + "\n\nStore data:\n" + json.dumps(context, ensure_ascii=False)
         try:
             response = requests.post(
-                'https://api.openai.com/v1/chat/completions',
-                headers={'Authorization': f'Bearer {settings.OPENAI_API_KEY}'},
+                api_url,
+                headers={'Authorization': f'Bearer {api_key}'},
                 json={
-                    'model': settings.OPENAI_CHAT_MODEL,
+                    'model': model,
                     'messages': [
-                        {'role': 'system', 'content': "You are UrbanThread's professional customer assistant. Reply in the customer's language with a warm, polished, direct answer. Answer general questions helpfully using your general knowledge. For UrbanThread-specific details, use only the supplied store data; never invent product prices, availability, policies, delivery dates, or order details, and say when verified store information is unavailable. Do not reveal, quote, or dump raw context, JSON, or internal data. Keep replies concise. For one product, give its name, price, and availability, then put one plain product URL on its own line with no label. For a comparison or broad product search, show at most three relevant products as clean bullets, each with name, price, availability, and a plain URL on its own line. If no matching product exists in the data, say you could not find it and ask for the exact name or link. If the customer says yes/OK after a product suggestion, thank them and ask whether they want to order that specific product. For private order details, direct the customer to sign in and open My Orders.\n\nStore data:\n" + json.dumps(context, ensure_ascii=False)},
+                        {'role': 'system', 'content': system_content},
                         *safe_history,
                         {'role': 'user', 'content': message},
                     ],
@@ -270,7 +308,7 @@ class ChatView(APIView):
                     detail = exc.response.text[:500]
                 except Exception:
                     pass
-            logger.exception('UrbanThread chatbot OpenAI request failed: %s', detail)
+            logger.exception('UrbanThread chatbot %s request failed: %s', api_url, detail)
             return Response(
                 {'reply': _fallback_reply(message, context, history), 'fallback': True},
                 status=status.HTTP_200_OK,
