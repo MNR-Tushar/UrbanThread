@@ -1,77 +1,83 @@
-# 🧵 Urban Thread — E-Commerce REST API
+# 🧵 Urban Thread — E-Commerce REST API & AI Assistant Backend
 
-A production-ready Django REST Framework e-commerce backend for a fashion/clothing store. Built with async task processing, multi-container Docker setup, and CI/CD pipeline. Supports product management, inventory, cart, orders, coupons, payments (SSLCommerz + Cash on Delivery), reviews, and automated background jobs.
+A production-ready, feature-rich Django REST Framework backend powering the **Urban Thread** fashion and apparel storefront. Built with Django 6.0, Python 3.12, Celery async task processing, Redis caching & message broker, Google Gemini AI customer chatbot, SSLCommerz payment gateway, Cloudinary image storage, and Docker multi-container deployment.
 
 ---
 
-## 🌐 Live Demo
+## 🌐 Live Services & Documentation
 
-| Resource       | URL                                                       |
-| -------------- | --------------------------------------------------------- |
-| **Swagger UI** | https://urbanthread-6nok.onrender.com/api/docs/           |
-| **ReDoc**      | https://urbanthread-6nok.onrender.com/redoc/              |
-| **Admin**      | https://urbanthread-6nok.onrender.com/admin/              |
+| Service / Resource | Local URL | Production URL |
+| :----------------- | :-------- | :------------- |
+| **Live Storefront (Frontend)** | `http://localhost:5173/` | [urbanthreadshop.vercel.app](https://urbanthreadshop.vercel.app/) |
+| **API Base URL** | `http://127.0.0.1:8000/` | `https://urbanthread-6nok.onrender.com/` |
+| **Swagger UI (Spectacular)** | `http://127.0.0.1:8000/api/docs/` | `https://urbanthread-6nok.onrender.com/api/docs/` |
+| **OpenAPI Schema (JSON)** | `http://127.0.0.1:8000/api/schema/` | `https://urbanthread-6nok.onrender.com/api/schema/` |
+| **ReDoc UI** | `http://127.0.0.1:8000/api/schema/redoc/` | `https://urbanthread-6nok.onrender.com/api/schema/redoc/` |
+| **Django Admin Panel** | `http://127.0.0.1:8000/admin/` | `https://urbanthread-6nok.onrender.com/admin/` |
+| **Celery Flower Dashboard** | `http://127.0.0.1:5555/` *(Docker)* | Internal / Protected |
 
 ---
 
 ## 📋 Table of Contents
 
-- [🧵 Urban Thread — E-Commerce REST API](#-urban-thread--e-commerce-rest-api)
-  - [🌐 Live Demo](#-live-demo)
+- [🧵 Urban Thread — E-Commerce REST API & AI Assistant Backend](#-urban-thread--e-commerce-rest-api--ai-assistant-backend)
+  - [🌐 Live Services \& Documentation](#-live-services--documentation)
   - [📋 Table of Contents](#-table-of-contents)
   - [🛠 Tech Stack](#-tech-stack)
   - [📁 Project Structure](#-project-structure)
   - [✨ Features](#-features)
-    - [Core](#core)
-    - [Background Tasks (Celery)](#background-tasks-celery)
-  - [🏗 Architecture Overview](#-architecture-overview)
-  - [⚙️ Installation \& Setup](#️-installation--setup)
-    - [Option A: Docker (Recommended)](#option-a-docker-recommended)
-    - [Option B: Local Setup](#option-b-local-setup)
+    - [1. User Authentication \& Profile Security](#1-user-authentication--profile-security)
+    - [2. Products, Catalog \& Media](#2-products-catalog--media)
+    - [3. Inventory \& Stock Tracking](#3-inventory--stock-tracking)
+    - [4. Shopping Cart \& Coupons](#4-shopping-cart--coupons)
+    - [5. Orders, Delivery \& Returns](#5-orders-delivery--returns)
+    - [6. Payments (SSLCommerz + COD)](#6-payments-sslcommerz--cod)
+    - [7. Customer Reviews \& Wishlist](#7-customer-reviews--wishlist)
+    - [8. AI Support Chatbot (Gemini / OpenAI)](#8-ai-support-chatbot-gemini--openai)
+    - [9. Asynchronous \& Scheduled Tasks (Celery + Beat)](#9-asynchronous--scheduled-tasks-celery--beat)
+  - [🏗 System Architecture](#-system-architecture)
+  - [⚙️ Getting Started \& Setup](#️-getting-started--setup)
+    - [Option A: Local Development (Windows / macOS / Linux)](#option-a-local-development-windows--macos--linux)
+    - [Option B: Docker Compose (Multi-Container Setup)](#option-b-docker-compose-multi-container-setup)
   - [🔑 Environment Variables](#-environment-variables)
-  - [🚀 Running the Server](#-running-the-server)
-    - [Docker](#docker)
-    - [Local](#local)
-  - [⚡ Background Tasks (Celery)](#-background-tasks-celery)
-    - [Async Tasks](#async-tasks)
-    - [Periodic Tasks (Celery Beat)](#periodic-tasks-celery-beat)
-    - [Monitor Celery (Docker)](#monitor-celery-docker)
-  - [📡 API Endpoints](#-api-endpoints)
-    - [Accounts](#accounts)
-    - [Products](#products)
-    - [Inventory](#inventory)
-    - [Cart](#cart)
-    - [Coupons](#coupons)
-    - [Orders](#orders)
-    - [Payments](#payments)
-    - [Reviews](#reviews)
-  - [🔐 Authentication](#-authentication)
-  - [💳 Payment Integration](#-payment-integration)
-    - [SSLCommerz](#sslcommerz)
-    - [Cash on Delivery](#cash-on-delivery)
-  - [🛡 Admin Panel](#-admin-panel)
-  - [📖 API Documentation](#-api-documentation)
-  - [🔄 CI/CD Pipeline](#-cicd-pipeline)
+  - [⚡ Celery Background Workers \& Beat Scheduler](#-celery-background-workers--beat-scheduler)
+  - [📡 Complete API Endpoints](#-complete-api-endpoints)
+    - [Accounts (`/accounts/`)](#accounts-accounts)
+    - [Products, Banners \& Settings (`/products/`)](#products-banners--settings-products)
+    - [Inventory Management (`/inventory/inventorys/`)](#inventory-management-inventoryinventorys)
+    - [Shopping Cart (`/cart/`)](#shopping-cart-cart)
+    - [Coupons (`/coupons/`)](#coupons-coupons)
+    - [Orders, Tracking \& Returns (`/orders/`)](#orders-tracking--returns-orders)
+    - [Payments (`/payments/`)](#payments-payments)
+    - [Reviews (`/reviews/`)](#reviews-reviews)
+    - [AI Chatbot (`/chatbot/`)](#ai-chatbot-chatbot)
+  - [🤖 AI Chatbot Details](#-ai-chatbot-details)
+  - [💳 Payment Gateway Integration](#-payment-gateway-integration)
+  - [📧 Transactional Emails (Brevo / SendGrid)](#-transactional-emails-brevo--sendgrid)
+  - [🛡 Django Admin \& Staff Features](#-django-admin--staff-features)
+  - [🔄 Testing \& CI/CD](#-testing--cicd)
   - [📝 License](#-license)
 
 ---
 
 ## 🛠 Tech Stack
 
-| Layer            | Technology                                                  |
-| ---------------- | ----------------------------------------------------------- |
-| Framework        | Django 4.x + Django REST Framework                          |
-| Auth             | JWT via `djangorestframework-simplejwt`                     |
-| Database         | PostgreSQL (production) / SQLite (dev)                      |
-| Cache & Broker   | Redis (separate instances for cache and Celery broker)      |
-| Async Tasks      | Celery + Celery Beat (periodic tasks)                       |
-| Payment Gateway  | SSLCommerz + Cash on Delivery                               |
-| Filtering        | `django-filter`                                             |
-| API Docs         | drf-spectacular (Swagger UI) + drf-yasg (ReDoc)             |
-| Containerization | Docker + Docker Compose (multi-container)                   |
-| CI/CD            | GitHub Actions                                              |
-| CORS             | `django-cors-headers`                                       |
-| Config           | `python-decouple`                                           |
+| Component | Technology | Version / Details |
+| --------- | ---------- | ----------------- |
+| **Framework** | Django + Django REST Framework | Django 6.0.1, DRF 3.16.1 |
+| **Runtime** | Python | 3.12+ (tested on Python 3.12 / 3.13) |
+| **Authentication** | JWT (`djangorestframework-simplejwt`) + Google OAuth | Access & refresh rotation, token blacklist, `google-auth` token verification |
+| **Database** | PostgreSQL (Docker/Prod) or SQLite (Local Dev) | `psycopg2-binary`, configured with `dj-database-url` |
+| **Caching** | Redis / LocMemCache | `django-redis` with Redis 7; falls back gracefully to `LocMemCache` |
+| **Task Queue** | Celery + Celery Beat + Flower | `celery 5.6.3`, `django-celery-beat`, `flower 2.0.1` |
+| **Cloud Storage** | Cloudinary / WhiteNoise | `cloudinary 1.47.0` for user uploads, `whitenoise 6.12.0` for static files |
+| **AI Assistant** | Google Gemini API (native REST) / OpenAI | Fallback across `gemini-3.8-flash`, `gemini-2.5-flash`, `gemini-1.5-flash` |
+| **Payment Gateway** | SSLCommerz + Cash on Delivery (COD) | Sandbox & live modes, IPN webhooks, refund endpoints |
+| **Email & SMS** | Brevo API / SendGrid API / Console / SMS Webhook | Transactional OTP, welcome messages, order notifications |
+| **Invoicing** | ReportLab | PDF invoice generation (`/orders/{id}/invoice/`) |
+| **API Documentation** | drf-spectacular (OpenAPI 3) + drf-yasg | Swagger UI and ReDoc generators |
+| **Containerization** | Docker & Docker Compose | Multi-stage Dockerfile, PostgreSQL, Redis, Celery, Beat, Flower |
+| **CI/CD** | GitHub Actions | Flake8 linting, `manage.py check`, migration test, GHCR Docker build |
 
 ---
 
@@ -80,527 +86,457 @@ A production-ready Django REST Framework e-commerce backend for a fashion/clothi
 ```
 urbanthread/
 ├── .github/
-│   └── workflows/          # GitHub Actions CI/CD pipeline
-├── accounts/               # Custom user, profile, address, email verification
-├── cart/                   # Shopping cart & cart items
-├── coupons/                # Discount coupon management + auto-expiry tasks
-├── inventory/              # Stock management per product variant
-├── orders/                 # Order creation, management, auto-cancellation tasks
-├── payments/               # SSLCommerz & Cash on Delivery integration
-├── products/               # Category, brand, product, images, size, color
-├── reviews/                # Product reviews & ratings
-├── urbanthread/            # Project settings, URLs, WSGI/ASGI, Celery config
-├── Dockerfile
-├── docker-compose.yml
+│   └── workflows/          # GitHub Actions CI/CD workflows
+├── accounts/               # Custom user, profile, address, Google OAuth, OTP verification
+├── cart/                   # Shopping cart, cart items, guest cart support
+├── chatbot/                # AI assistant view, Gemini/OpenAI caller, store knowledge base
+├── coupons/                # Discount coupons, percentage discounts, auto-expiry tasks
+├── inventory/              # Variant stock management (product × color × size)
+├── management/             # Custom management commands (e.g. migrate_media_to_cloudinary)
+├── media/                  # Local media upload folder (used when Cloudinary is not active)
+├── orders/                 # Order placement, tracking history, return requests, PDF invoices
+├── payments/               # SSLCommerz gateway integration, IPN callbacks, refunds
+├── products/               # Products, categories, brands, colors, sizes, images, banners, store settings
+├── reviews/                # Product ratings and verified reviews
+├── staticfiles/            # Collected static files
+├── urbanthread/            # Settings, URLs, WSGI, ASGI, Celery app definition, custom storage
+├── .dockerignore
+├── .env                    # Environment configuration (ignored in git)
+├── .env.example            # Sample environment variables
+├── .gitignore
+├── BREVO_SETUP_BN.md       # Bengali guide for Brevo email setup
+├── SENDGRID_SETUP_BN.md    # Bengali guide for SendGrid email setup
+├── docker-compose.yml      # Multi-container orchestration (web, db, redis, celery, beat, flower)
+├── Dockerfile              # Multi-stage production container build
 ├── manage.py
-└── requirements.txt
+├── populate_test_data.py   # Seed script for test products & demo accounts
+└── requirements.txt        # Pinned Python dependencies
 ```
 
 ---
 
 ## ✨ Features
 
-### Core
-- **User Auth** — Register with email verification, login/logout via JWT, token refresh & blacklist
-- **Products** — Full CRUD for categories, brands, products, images, sizes, colors
-- **Inventory** — Track stock per (product × color × size) variant with real-time availability check
-- **Cart** — Add, update, remove items with real-time stock validation
-- **Coupons** — Percentage-based discount coupons with expiry dates
-- **Orders** — Place orders from cart, cancel orders, view history; inventory auto-decremented on order placement
-- **Payments** — SSLCommerz online payment + Cash on Delivery; IPN webhook support; refunds
-- **Reviews** — Authenticated users can leave 1–5 star reviews on products
+### 1. User Authentication & Profile Security
+- **JWT Authentication:** Access token (60-day) and Refresh token (10-day) with automatic rotation and token blacklisting upon logout.
+- **Google One-Tap / OAuth Sign-in:** Validates Google ID tokens via backend Google Auth API and automatically registers/signs in users.
+- **Email & Phone OTP:** Registration verification, resend cooldowns, and OTP expiration (15 minutes).
+- **Password Reset & Change:** Secure OTP-based reset flows without requiring insecure reset links.
+- **Rate Throttling:** Strict throttling on login (5/min), register (5/hr), OTP requests, and chatbot interactions.
 
-### Background Tasks (Celery)
-- **Email Verification** — Async email dispatch with retry logic on failure
-- **Coupon Auto-Expiry** — Periodic task marks expired coupons as inactive
-- **Order Auto-Cancellation** — Cancels unpaid/stale orders after a configurable timeout
-- **Low Stock Alerts** — Notifies admins when inventory drops below threshold
-- **Abandoned Cart Reminders** — Sends reminder emails to users with inactive carts
+### 2. Products, Catalog & Media
+- Full catalog hierarchy: Categories, Brands, Products, Colors, Sizes, and Multiple Product Images.
+- Dynamic Store Settings & Banners API for homepage banners and delivery charge thresholds.
+- Filtering, keyword search (`?search=`), sorting (`?ordering=-created_at`), and Limit/Offset pagination.
+- Automatic image uploads to **Cloudinary** (when configured) or local filesystem.
 
----
+### 3. Inventory & Stock Tracking
+- Granular stock tracking per variant: `(Product, Color, Size)`.
+- Real-time availability check endpoint (`/inventory/inventorys/check_availability/`).
+- Auto-decrement on order placement and auto-restock on order cancellation.
 
-## 🏗 Architecture Overview
+### 4. Shopping Cart & Coupons
+- Authenticated customer cart with Redis-backed caching for high throughput.
+- Guest cart support using unique `X-Guest-Cart` request header.
+- Percentage-based coupon discounts with validation and automated expiry.
 
-```
-┌─────────────────────────────────────────────────────┐
-│                   Docker Compose                    │
-│                                                     │
-│  ┌──────────┐   ┌──────────┐   ┌─────────────────┐ │
-│  │  Django  │   │ Celery   │   │  Celery Beat    │ │
-│  │  (web)   │   │ Worker   │   │  (Scheduler)    │ │
-│  └────┬─────┘   └────┬─────┘   └────────┬────────┘ │
-│       │              │                  │           │
-│  ┌────▼──────────────▼──────────────────▼────────┐  │
-│  │              Redis (Broker)                   │  │
-│  └───────────────────────────────────────────────┘  │
-│                                                     │
-│  ┌─────────────────┐   ┌───────────────────────┐   │
-│  │  Redis (Cache)  │   │      PostgreSQL        │   │
-│  └─────────────────┘   └───────────────────────┘   │
-└─────────────────────────────────────────────────────┘
-```
+### 5. Orders, Delivery & Returns
+- Complete order checkout with address snapshot, zone-based delivery calculation, and coupon discount.
+- Order tracking status pipeline: `pending` → `processing` → `shipped` → `delivered` / `cancelled`.
+- **Return & Refund Requests:** Customers can request returns for delivered orders; staff can review, approve, and track status.
+- **PDF Invoice Generation:** Downloadable invoice generated dynamically using ReportLab (`/orders/{id}/invoice/`).
 
-> Two separate Redis instances: one for **Celery broker/results**, one for **Django cache**.
+### 6. Payments (SSLCommerz + COD)
+- **SSLCommerz Online Payment:** Initiation URL, browser callbacks (`success`, `fail`, `cancel`), and automated IPN webhook verification.
+- **Cash on Delivery (COD):** Instant checkout placement with `unpaid` status.
+- Admin refund management endpoint and detailed payment audit logs.
 
----
+### 7. Customer Reviews & Wishlist
+- 1–5 star ratings, text reviews, and product-specific review listings.
+- User Wishlist API (`/products/wishlist/`) to save favorite items.
 
-## ⚙️ Installation & Setup
+### 8. AI Support Chatbot (Gemini / OpenAI)
+- Interactive customer assistant endpoint (`POST /chatbot/`).
+- Powered by **Google Gemini API** (`gemini-3.8-flash` primary, auto-fallback to `gemini-2.5-flash` and `gemini-1.5-flash`), or OpenAI.
+- Injects real-time catalog data (products, prices, stock, delivery charges, store return policies).
+- Bilingual support: effortlessly communicates in both English and Bengali (Bangla & Romanized Bangla).
 
-### Option A: Docker (Recommended)
-
-**Prerequisites:** Docker & Docker Compose installed.
-
-```bash
-# 1. Clone the repository
-git clone https://github.com/MNR-Tushar/UrbanThread.git
-cd UrbanThread
-
-# 2. Create environment file
-cp .env.example .env
-# Edit .env with your values
-
-# 3. Build and start all containers
-docker compose up --build
-
-# 4. In a new terminal, run migrations
-docker compose exec web python manage.py migrate
-
-# 5. Create a superuser
-docker compose exec web python manage.py createsuperuser
-```
-
-The API will be available at `http://localhost:8000/`
-
-**Services started by Docker Compose:**
-| Service        | Description                          |
-| -------------- | ------------------------------------ |
-| `web`          | Django application server            |
-| `db`           | PostgreSQL database                  |
-| `redis_broker` | Redis for Celery broker & results    |
-| `redis_cache`  | Redis for Django cache               |
-| `celery`       | Celery worker for async tasks        |
-| `celery_beat`  | Celery Beat scheduler for cron tasks |
+### 9. Asynchronous & Scheduled Tasks (Celery + Beat)
+- **Async Execution:** Asynchronous verification emails, invoice dispatches, and stock sync without blocking web threads.
+- **Periodic Scheduler:**
+  - Hourly coupon expiration check (`expire_coupons`).
+  - Order auto-cancellation for stale unpaid orders (`auto_cancel_orders`).
+  - Daily low-stock inventory alerts for store admins (`send_low_stock_alerts`).
+  - Daily abandoned cart reminder emails (`send_abandoned_cart_reminders`).
 
 ---
 
-### Option B: Local Setup
+## 🏗 System Architecture
 
-**Prerequisites:** Python 3.10+, PostgreSQL, Redis
+```
+                               ┌─────────────────────────────┐
+                               │   React Frontend (Vite)     │
+                               │   http://localhost:5173     │
+                               └──────────────┬──────────────┘
+                                              │ HTTP / JSON
+                                              ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                                Django REST Backend                                     │
+│                                http://127.0.0.1:8000                                   │
+│                                                                                        │
+│   ┌────────────────────┐   ┌───────────────────────┐   ┌───────────────────────────┐   │
+│   │ REST Endpoints     │   │ AI Chatbot Service    │   │ SSLCommerz Payment Module │   │
+│   │ (DRF ViewSets)     │   │ (Gemini 3.8 / OpenAI) │   │ (Gateway & IPN Handlers)  │   │
+│   └─────────┬──────────┘   └───────────┬───────────┘   └─────────────┬─────────────┘   │
+└─────────────┼──────────────────────────┼─────────────────────────────┼─────────────────┘
+              │                          │                             │
+              ▼                          ▼                             ▼
+   ┌────────────────────┐     ┌───────────────────────┐     ┌───────────────────────┐
+   │ PostgreSQL / SQLite│     │ Google Generative AI  │     │ SSLCommerz Gateway    │
+   │ (Application DB)   │     │ (REST API Endpoint)   │     │ (Sandbox / Live API)  │
+   └────────────────────┘     └───────────────────────┘     └───────────────────────┘
+              │
+              ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                                Background Task Engine                                  │
+│                                                                                        │
+│   ┌────────────────────┐   ┌───────────────────────┐   ┌───────────────────────────┐   │
+│   │ Redis (Broker &    │──▶│ Celery Worker         │──▶│ Celery Beat Scheduler     │   │
+│   │ Django Cache)      │   │ (Async Emails & Tasks)│   │ (Cron / Periodic Jobs)    │   │
+│   └────────────────────┘   └───────────────────────┘   └─────────────┬─────────────┘   │
+│                                                                      │                 │
+│                                                                      ▼                 │
+│                                                            ┌───────────────────┐       │
+│                                                            │ Flower Dashboard  │       │
+│                                                            │ Port 5555         │       │
+│                                                            └───────────────────┘       │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
 
-```bash
-# 1. Clone the repository
-git clone https://github.com/MNR-Tushar/UrbanThread.git
-cd UrbanThread
+---
 
-# 2. Create & activate virtual environment
+## ⚙️ Getting Started & Setup
+
+### Option A: Local Development (Windows / macOS / Linux)
+
+**Prerequisites:** Python 3.10+ (Python 3.12 recommended), Git. Redis is optional for local development (Django will automatically fall back to memory broker & LocMemCache).
+
+#### 1. Navigate to the backend directory
+```powershell
+# From the repository root:
+cd urbanthread
+```
+
+#### 2. Create and activate a virtual environment
+```powershell
+# Windows PowerShell:
+..\venv\Scripts\Activate.ps1
+# Or create a local one:
 python -m venv venv
-source venv/bin/activate        # macOS/Linux
-# venv\Scripts\activate         # Windows
+.\venv\Scripts\Activate.ps1
 
-# 3. Install dependencies
+# macOS / Linux:
+python3 -m venv venv
+source venv/bin/activate
+```
+
+#### 3. Install dependencies
+```bash
 pip install -r requirements.txt
+```
 
-# 4. Configure environment variables
-cp .env.example .env
-# Edit .env with your values
+#### 4. Configure environment variables
+Create a `.env` file in the `urbanthread/` directory (see [.env.example](.env.example)):
+```env
+SECRET_KEY=your-secure-secret-key-change-in-production
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1
+DB_ENGINE=django.db.backends.sqlite3
+REDIS_URL=locmem
+FRONTEND_URL=http://localhost:5173
+```
 
-# 5. Apply migrations
+#### 5. Run migrations and initialize data
+```powershell
 python manage.py migrate
-
-# 6. Create superuser
 python manage.py createsuperuser
+```
 
-# 7. Start Celery worker (separate terminal)
-celery -A urbanthread worker --loglevel=info
+*(Optional)* Seed sample products and brands for local testing:
+```powershell
+python populate_test_data.py
+```
+> ⚠️ **Warning:** `populate_test_data.py` creates demo test accounts with default passwords. Use only in local development!
 
-# 8. Start Celery Beat scheduler (separate terminal)
-celery -A urbanthread beat --loglevel=info
+#### 6. Start the development server
+```powershell
+python manage.py runserver 127.0.0.1:8000
+```
+Visit `http://127.0.0.1:8000/api/docs/` to inspect the Swagger UI documentation.
 
-# 9. Run the server
-python manage.py runserver
+---
+
+### Option B: Docker Compose (Multi-Container Setup)
+
+**Prerequisites:** Docker and Docker Compose installed.
+
+```bash
+# 1. Navigate to backend directory
+cd urbanthread
+
+# 2. Prepare .env file
+cp .env.example .env
+# Ensure DB_HOST=db and REDIS_URL=redis://redis:6379/0 are set
+
+# 3. Build and launch all containers
+docker compose up --build
+```
+
+**Services started by `docker-compose.yml`:**
+| Service | Image | Internal Port | Host Port | Purpose |
+| ------- | ----- | ------------- | --------- | ------- |
+| `web` | Custom (Dockerfile) | 8000 | `8000` | Django DRF application (Gunicorn) |
+| `db` | `postgres:16-alpine` | 5432 | Internal | PostgreSQL database |
+| `redis` | `redis:7-alpine` | 6379 | `6379` | Celery broker & Django cache |
+| `celery` | Custom (Dockerfile) | - | - | Background task worker |
+| `celery_beat` | Custom (Dockerfile) | - | - | Periodic task scheduler |
+| `flower` | Custom (Dockerfile) | 5555 | `5555` | Celery real-time monitor |
+
+To run migrations or create a superuser inside Docker:
+```bash
+docker compose exec web python manage.py migrate
+docker compose exec web python manage.py createsuperuser
 ```
 
 ---
 
 ## 🔑 Environment Variables
 
-Create a `.env` file in the project root:
+The application reads configuration from the environment or `.env` using `python-decouple`.
 
-```env
-# Django
-SECRET_KEY=your-secret-key-here
-DEBUG=True
-ALLOWED_HOSTS=localhost,127.0.0.1
-
-# Database (PostgreSQL)
-DB_NAME=urbanthread
-DB_USER=postgres
-DB_PASSWORD=your-db-password
-DB_HOST=db           # 'db' for Docker, 'localhost' for local
-DB_PORT=5432
-
-# Redis — Celery Broker
-REDIS_BROKER_URL=redis://redis_broker:6379/0
-
-# Redis — Django Cache
-REDIS_CACHE_URL=redis://redis_cache:6379/0
-
-# SSLCommerz Payment Gateway
-SSLCOMMERZ_STORE_ID=your_store_id
-SSLCOMMERZ_STORE_PASSWORD=your_store_password
-SSLCOMMERZ_IS_SANDBOX=True
-
-# Frontend URL (for payment redirects)
-FRONTEND_URL=http://localhost:3000
-GOOGLE_CLIENT_ID=your-google-oauth-web-client-id.apps.googleusercontent.com
-
-# Email (Brevo Transactional API)
-BREVO_API_KEY=xkeysib-your-brevo-api-key
-BREVO_SENDER_EMAIL=verified-sender@your-domain.com
-BREVO_SENDER_NAME=UrbanThread
-BREVO_API_TIMEOUT=15
-EMAIL_DAILY_SEND_CAP=250
-EMAIL_OTP_COOLDOWN_SECONDS=60
-EMAIL_OTP_PER_ADDRESS_PER_HOUR=3
-
-# Optional phone OTP provider (Bearer token + JSON API)
-SMS_API_URL=https://your-sms-provider.example/send
-SMS_API_TOKEN=your-sms-api-token
-SMS_SENDER_ID=UrbanThread
-```
+| Variable | Default Value | Required | Purpose / Notes |
+| -------- | ------------- | :------: | --------------- |
+| `SECRET_KEY` | *(django-insecure fallback)* | **Yes (Prod)** | Django cryptographic signature key |
+| `DEBUG` | `True` | No | Set to `False` in production |
+| `ALLOWED_HOSTS` | `localhost,127.0.0.1` | No | Comma-separated list of hostnames |
+| `DATABASE_URL` | *Empty* | No | PostgreSQL connection URL (e.g. Supabase / Render) |
+| `DB_ENGINE` | `django.db.backends.sqlite3` | No | `django.db.backends.postgresql` for Postgres |
+| `DB_NAME` | `urbanthread` | No | PostgreSQL database name |
+| `DB_USER` | `postgres` | No | PostgreSQL username |
+| `DB_PASSWORD` | *Empty* | No | PostgreSQL password |
+| `DB_HOST` | `localhost` | No | Host address (`db` inside Docker) |
+| `DB_PORT` | `5432` | No | Database port |
+| `REDIS_URL` | `locmem` | No | `redis://localhost:6379/0` (or `locmem` for memory cache) |
+| `CELERY_BROKER_URL` | Same as `REDIS_URL` | No | Celery broker override (`memory://` if no Redis) |
+| `CELERY_RESULT_BACKEND` | Same as `REDIS_URL` | No | Celery results storage |
+| `FRONTEND_URL` | `http://localhost:5173` | No | Frontend origin (production: `https://urbanthreadshop.vercel.app`) |
+| `BACKEND_PUBLIC_URL` | *Empty* | No | Public HTTPS URL (required for SSLCommerz callbacks) |
+| `GOOGLE_CLIENT_ID` | *Empty* | No | Google OAuth 2.0 Web Client ID |
+| `GEMINI_API_KEY` | *Empty* | No | Google AI Studio Gemini API key (for customer chatbot) |
+| `GEMINI_CHAT_MODEL` | `gemini-3.8-flash` | No | Gemini model name |
+| `OPENAI_API_KEY` | *Empty* | No | OpenAI API key (if `CHATBOT_PROVIDER=openai`) |
+| `CHATBOT_PROVIDER` | `gemini` | No | Active chatbot engine (`gemini` or `openai`) |
+| `CLOUDINARY_URL` | *Empty* | No | Format: `cloudinary://API_KEY:SECRET@CLOUD_NAME` |
+| `SSLCOMMERZ_STORE_ID` | *Empty* | No | SSLCommerz Store ID |
+| `SSLCOMMERZ_STORE_PASSWORD` | *Empty* | No | SSLCommerz Store Password |
+| `SSLCOMMERZ_IS_SANDBOX` | `True` | No | Set to `False` for live payments |
+| `BREVO_API_KEY` | *Empty* | No | Brevo transactional email API key |
+| `BREVO_SENDER_EMAIL` | `noreply@urbanthread.com` | No | Verified Brevo sender address |
+| `BREVO_SENDER_NAME` | `UrbanThread` | No | Display name in outgoing emails |
+| `SENDGRID_API_KEY` | *Empty* | No | Alternative SendGrid API key |
+| `SMS_API_URL` | *Empty* | No | Optional SMS gateway endpoint for phone OTP |
+| `SMS_API_TOKEN` | *Empty* | No | Bearer token for SMS gateway |
 
 ---
 
-## 🚀 Running the Server
+## ⚡ Celery Background Workers & Beat Scheduler
 
-### Docker
-```bash
-docker compose up
+When running outside Docker with Redis:
+
+```powershell
+# Terminal 1 — Start Celery worker:
+celery -A urbanthread worker --loglevel=info
+
+# Terminal 2 — Start Celery Beat scheduler:
+celery -A urbanthread beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+
+# Terminal 3 — (Optional) Start Flower monitor:
+celery -A urbanthread flower --port=5555
 ```
 
-### Local
-```bash
-python manage.py runserver
-```
+> 💡 **Local Dev Note:** If `REDIS_URL=locmem` (default), Celery runs in eager mode (`CELERY_TASK_ALWAYS_EAGER=True`), meaning background tasks run synchronously inline without needing a separate Redis process or worker.
 
 ---
 
-## ⚡ Background Tasks (Celery)
+## 📡 Complete API Endpoints
 
-Urban Thread uses **Celery** for async and periodic task processing with Redis as the message broker.
-
-### Async Tasks
-| Task | Trigger | Description |
-|------|---------|-------------|
-| `send_verification_email` | User registration | Sends email verification link asynchronously with retry on failure |
-
-### Periodic Tasks (Celery Beat)
-| Task | Schedule | Description |
-|------|----------|-------------|
-| `expire_coupons` | Every hour | Marks expired coupons as inactive |
-| `auto_cancel_orders` | Every 30 min | Cancels unpaid orders past timeout |
-| `send_low_stock_alerts` | Daily | Emails admin for low-inventory variants |
-| `send_abandoned_cart_reminders` | Daily | Sends reminder emails to users with old active carts |
-
-### Monitor Celery (Docker)
-```bash
-# View worker logs
-docker compose logs celery
-
-# View beat scheduler logs
-docker compose logs celery_beat
-
-# Check active tasks
-docker compose exec celery celery -A urbanthread inspect active
-```
-
----
-
-## 📡 API Endpoints
-
-All API routes are prefixed with their app name. Protected routes require:
-```
+All protected endpoints require the following header:
+```http
 Authorization: Bearer <access_token>
 ```
 
----
+### Accounts (`/accounts/`)
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :---: | :--- |
+| `POST` | `/accounts/register/` | Public | Register new user & dispatch email verification OTP |
+| `POST` | `/accounts/login/` | Public | Sign in with username/email & password; returns JWT pair |
+| `POST` | `/accounts/google/` | Public | Sign in or register using Google OAuth ID token |
+| `POST` | `/accounts/token/refresh/` | Public | Rotate refresh token to receive new access token |
+| `POST` | `/accounts/logout/` | Required | Blacklist refresh token & log out |
+| `POST` | `/accounts/email/verification/confirm/` | Public | Confirm email OTP; activates account and returns JWT |
+| `POST` | `/accounts/email/verification/resend/` | Public | Resend email verification code |
+| `POST` | `/accounts/password/reset/request/` | Public | Request password-reset OTP via email or SMS |
+| `POST` | `/accounts/password/reset/confirm/` | Public | Verify OTP and set new password |
+| `POST` | `/accounts/password/change/` | Required | Change password while authenticated |
+| `GET/PUT/PATCH` | `/accounts/profile/` | Required | View and update customer profile |
+| `GET/POST` | `/accounts/address/` | Required | List and create delivery addresses |
+| `GET/PUT/DELETE`| `/accounts/address/{id}/` | Required | Manage individual delivery address |
+| `GET` | `/accounts/allusers/` | Staff | List all registered users |
 
-### Accounts
+### Products, Banners & Settings (`/products/`)
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :---: | :--- |
+| `GET` | `/products/products/` | Public | List products (supports `?search=`, `?category=`, `?brand=`, `?ordering=`) |
+| `GET` | `/products/products/{id_or_slug}/` | Public | Retrieve product details with images, sizes, colors |
+| `POST/PUT/DELETE` | `/products/products/{id}/` | Staff | Create, update, or remove products |
+| `GET` | `/products/categories/` | Public | List categories |
+| `GET` | `/products/brands/` | Public | List brands |
+| `GET` | `/products/sizes/` | Public | List available garment sizes (e.g., S, M, L, XL) |
+| `GET` | `/products/colors/` | Public | List available colors |
+| `GET` | `/products/banners/` | Public | Active promotional banners for homepage carousel |
+| `GET` | `/products/store-settings/` | Public | Store shipping fees, free shipping threshold, announcements |
+| `GET` | `/products/delivery-zones/` | Public | List delivery zones and rates (Dhaka, Outside Dhaka, etc.) |
+| `GET/POST` | `/products/wishlist/` | Required | View user wishlist or add an item |
+| `DELETE` | `/products/wishlist/{product_id}/` | Required | Remove item from wishlist |
 
-Base URL: `/accounts/`
+### Inventory Management (`/inventory/inventorys/`)
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :---: | :--- |
+| `GET` | `/inventory/inventorys/` | Staff | List all inventory entries |
+| `GET` | `/inventory/inventorys/check_availability/` | Public | Query stock: `?product_id=X&color_id=Y&size_id=Z` |
+| `GET` | `/inventory/inventorys/product_inventory/` | Public | Stock records for a product: `?product_id=X` |
+| `POST/PUT/DELETE` | `/inventory/inventorys/` | Staff | Create or update inventory stock quantities |
 
-| Method               | Endpoint                      | Auth     | Description                      |
-| -------------------- | ----------------------------- | -------- | -------------------------------- |
-| POST                 | `/accounts/register/`         | Public   | Register + sends verification email |
-| POST                 | `/accounts/login/`            | Public   | Login and receive JWT tokens     |
-| POST                 | `/accounts/email/verification/resend/` | Public | Resend account verification code |
-| POST                 | `/accounts/email/verification/confirm/` | Public | Verify email and receive JWT tokens |
-| POST                 | `/accounts/google/` | Public | Verify Google ID token and sign in/register |
-| POST                 | `/accounts/logout/`           | Required | Blacklist refresh token / logout |
-| POST                 | `/accounts/token/refresh/`    | Public   | Refresh access token             |
-| POST                 | `/accounts/password/reset/request/` | Public | Send password-reset OTP to email or phone |
-| POST                 | `/accounts/password/reset/confirm/` | Public | Verify OTP and set a new password |
-| POST                 | `/accounts/password/change/` | Required | Change password using current password |
-| GET                  | `/accounts/allusers/`         | Required | List users (admins see all)      |
-| GET/PUT/PATCH        | `/accounts/allusers/{id}/`    | Required | Get/update user                  |
-| GET/POST             | `/accounts/address/`          | Required | List or create addresses         |
-| GET/PUT/PATCH/DELETE | `/accounts/address/{id}/`     | Required | Manage a single address          |
-| GET/POST             | `/accounts/profile/`          | Required | List or create profile           |
-| GET/PUT/PATCH/DELETE | `/accounts/profile/{id}/`     | Required | Manage profile                   |
+### Shopping Cart (`/cart/`)
+Supports authenticated user token or guest cart token header (`X-Guest-Cart: <token>`).
 
-**Register example:**
-```json
-POST /accounts/register/
-{
-  "username": "john_doe",
-  "email": "john@example.com",
-  "password": "securepassword123"
-}
-```
-> An email verification code is sent during registration. A welcome email is queued after the account is verified.
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :---: | :--- |
+| `GET` | `/cart/my_cart/` | Public / Guest | Retrieve current cart items, quantities, and subtotal |
+| `POST` | `/cart/add_item/` | Public / Guest | Add variant to cart (validates inventory availability) |
+| `PATCH` | `/cart/update_item/` | Public / Guest | Update item quantity in cart |
+| `DELETE` | `/cart/remove_item/` | Public / Guest | Remove single item from cart |
+| `DELETE` | `/cart/clear_cart/` | Public / Guest | Empty entire shopping cart |
 
-New password-based registrations remain inactive until the email OTP is verified. Set the same Google OAuth **Web client ID** in backend `GOOGLE_CLIENT_ID` and frontend `VITE_GOOGLE_CLIENT_ID`; add the frontend origins (for example `http://localhost:5173`) to the OAuth client's allowed JavaScript origins. The backend verifies Google ID tokens with Google's `google-auth` library.
+### Coupons (`/coupons/`)
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :---: | :--- |
+| `GET` | `/coupons/` | Required | List active discount coupons |
+| `POST` | `/coupons/validate_coupon/` | Required | Validate coupon code and get discount percentage |
+| `POST/PUT/DELETE` | `/coupons/` | Staff | Create and manage discount coupons |
 
-Phone OTP expects the configured SMS API to accept a Bearer token and a JSON body with `to`, `message`, and `sender`. Email uses Brevo's transactional API when `BREVO_API_KEY` is set; see [the Bangla setup guide](BREVO_SETUP_BN.md). OTPs expire after 15 minutes and allow at most five verification attempts.
+### Orders, Tracking & Returns (`/orders/`)
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :---: | :--- |
+| `POST` | `/orders/create_order/` | Required | Checkout cart (`address_id`, `payment_method`, `coupon_code`) |
+| `GET` | `/orders/order_history/` | Required | View authenticated customer's order history |
+| `PATCH` | `/orders/{id}/cancel_order/` | Required | Cancel eligible order (auto-restores stock) |
+| `GET` | `/orders/{id}/invoice/` | Required | Download generated PDF invoice |
+| `GET/POST` | `/orders/return-requests/` | Required | List return requests or submit a return for delivered order |
+| `PATCH` | `/orders/return-requests/{id}/` | Staff | Approve, reject, or complete a return request |
+| `GET` | `/orders/admin_dashboard/` | Staff | Order analytics summary (sales, revenue, counts) |
+| `GET` | `/orders/admin_orders/` | Staff | View all customer orders with filtering |
+| `PATCH` | `/orders/{id}/admin_update_status/` | Staff | Update order status (`pending`, `processing`, `shipped`, `delivered`, `cancelled`) |
+| `PATCH` | `/orders/{id}/admin_update_tracking/`| Staff | Update courier name and tracking code |
+| `POST` | `/orders/export_sales_report/` | Staff | Export CSV sales report |
 
----
+### Payments (`/payments/`)
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :---: | :--- |
+| `POST` | `/payments/initiate/` | Required | Initiate SSLCommerz payment for an order; returns `gateway_url` |
+| `POST` | `/payments/sslcommerz/success/` | Public | SSLCommerz browser success redirect |
+| `POST` | `/payments/sslcommerz/fail/` | Public | SSLCommerz browser failure redirect |
+| `POST` | `/payments/sslcommerz/cancel/` | Public | SSLCommerz browser cancellation redirect |
+| `POST` | `/payments/sslcommerz/ipn/` | Public | SSLCommerz Instant Payment Notification webhook |
+| `GET` | `/payments/my_payments/` | Required | View current user's payment records |
+| `POST` | `/payments/refund/` | Staff | Process refund via gateway |
 
-### Products
+### Reviews (`/reviews/`)
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :---: | :--- |
+| `GET` | `/reviews/` | Public | List reviews (filter by `?product_id=<id>`) |
+| `POST` | `/reviews/` | Required | Submit product rating (1–5) and review |
+| `PUT/PATCH/DELETE`| `/reviews/{id}/` | Required | Modify or delete own review |
 
-Base URL: `/products/`
-
-| Method           | Endpoint                    | Auth   | Description           |
-| ---------------- | --------------------------- | ------ | --------------------- |
-| GET              | `/products/categories/`     | Public | List all categories   |
-| POST             | `/products/categories/`     | Admin  | Create category       |
-| GET              | `/products/brands/`         | Public | List all brands       |
-| POST             | `/products/brands/`         | Admin  | Create brand          |
-| GET              | `/products/products/`       | Public | List all products     |
-| POST             | `/products/products/`       | Admin  | Create product        |
-| GET              | `/products/products/{id}/`  | Public | Product detail        |
-| PUT/PATCH/DELETE | `/products/products/{id}/`  | Admin  | Update/delete product |
-| GET/POST         | `/products/product-images/` | Admin  | Manage product images |
-| GET              | `/products/sizes/`          | Public | List all sizes        |
-| GET              | `/products/colors/`         | Public | List all colors       |
-
-**Filtering & Search:**
-- Filter: `?category=<id>&brand=<id>&is_available=true`
-- Search: `?search=<keyword>`
-- Order: `?ordering=price` or `?ordering=-created_at`
-- Pagination: `?limit=10&offset=0`
-
----
-
-### Inventory
-
-Base URL: `/inventorys/`
-
-| Method           | Endpoint                                     | Auth   | Description                 |
-| ---------------- | -------------------------------------------- | ------ | --------------------------- |
-| GET              | `/inventorys/inventorys/`                    | Public | List all inventory          |
-| POST             | `/inventorys/inventorys/`                    | Admin  | Create inventory entry      |
-| GET              | `/inventorys/inventorys/{id}/`               | Public | Single inventory entry      |
-| PUT/PATCH/DELETE | `/inventorys/inventorys/{id}/`               | Admin  | Update/delete inventory     |
-| GET              | `/inventorys/inventorys/check_availability/` | Public | Check stock for a variant   |
-| GET              | `/inventorys/inventorys/product_inventory/`  | Public | All inventory for a product |
-
-**Check availability:**
-```
-GET /inventorys/inventorys/check_availability/?product_id=1&color_id=2&size_id=3
-```
-
----
-
-### Cart
-
-Base URL: `/cart/`
-
-| Method | Endpoint             | Auth     | Description               |
-| ------ | -------------------- | -------- | ------------------------- |
-| GET    | `/cart/my_cart/`     | Required | View current user's cart  |
-| POST   | `/cart/add_item/`    | Required | Add item to cart          |
-| PATCH  | `/cart/update_item/` | Required | Update item quantity      |
-| DELETE | `/cart/remove_item/` | Required | Remove a single item      |
-| DELETE | `/cart/clear_cart/`  | Required | Clear all items from cart |
+### AI Chatbot (`/chatbot/`)
+| Method | Endpoint | Auth | Description |
+| :--- | :--- | :---: | :--- |
+| `POST` | `/chatbot/` | Public (Throttled) | AI assistant endpoint (`message`, optional `history`) |
 
 ---
 
-### Coupons
+## 🤖 AI Chatbot Details
 
-Base URL: `/coupons/`
-
-| Method           | Endpoint                    | Auth     | Description            |
-| ---------------- | --------------------------- | -------- | ---------------------- |
-| GET              | `/coupons/`                 | Required | List coupons           |
-| GET              | `/coupons/{id}/`            | Required | Get single coupon      |
-| POST             | `/coupons/`                 | Admin    | Create coupon          |
-| PUT/PATCH/DELETE | `/coupons/{id}/`            | Admin    | Update/delete coupon   |
-| POST             | `/coupons/validate_coupon/` | Required | Validate a coupon code |
-
-> Expired coupons are automatically deactivated by the `expire_coupons` Celery Beat task.
+The chatbot endpoint (`/chatbot/`) provides an intelligent shopping assistant for customers:
+- **Provider Flexibility:** Configure `CHATBOT_PROVIDER=gemini` (default, free tier) or `CHATBOT_PROVIDER=openai`.
+- **Gemini Fallback Chain:** Automatically tries `gemini-3.8-flash` → `gemini-2.5-flash` → `gemini-1.5-flash` with automatic retry logic upon rate limit or transient errors.
+- **Dynamic Context Injection:** Extracts keywords and URLs from the user's message, looks up matching products in the database, attaches prices and availability, and injects live delivery fees.
+- **Bilingual & Polished:** Detects whether the user is typing in Bengali or English (including Romanized Bengali) and answers accurately in the customer's language.
+- **Reliable Fallback:** If the external AI API is unreachable, an intelligent internal rule-based responder handles delivery charges, return instructions, order tracking directions, and product inquiries.
 
 ---
 
-### Orders
-
-Base URL: `/orders/`
-
-| Method | Endpoint                     | Auth     | Description                       |
-| ------ | ---------------------------- | -------- | --------------------------------- |
-| POST   | `/orders/create_order/`      | Required | Place an order from the cart      |
-| PATCH  | `/orders/{id}/cancel_order/` | Required | Cancel a pending/processing order |
-| GET    | `/orders/order_history/`     | Required | View order history                |
-
-**Create order example:**
-```json
-POST /orders/create_order/
-{
-  "address_id": 1,
-  "payment_method": "cash_on_delivery",
-  "coupon_code": "SAVE20"
-}
-```
-> **Supported payment methods:** `cash_on_delivery`, `sslcommerz`
-
-**Order status flow:** `pending` → `processing` → `completed` / `cancelled`
-
-> Unpaid orders are automatically cancelled after a timeout by the `auto_cancel_orders` Celery Beat task.
-
----
-
-### Payments
-
-Base URL: `/payments/`
-
-| Method | Endpoint                        | Auth     | Description                   |
-| ------ | ------------------------------- | -------- | ----------------------------- |
-| POST   | `/payments/initiate/`           | Required | Initiate payment for an order |
-| POST   | `/payments/sslcommerz/success/` | Public   | SSLCommerz success callback   |
-| POST   | `/payments/sslcommerz/fail/`    | Public   | SSLCommerz fail callback      |
-| POST   | `/payments/sslcommerz/cancel/`  | Public   | SSLCommerz cancel callback    |
-| POST   | `/payments/sslcommerz/ipn/`     | Public   | SSLCommerz IPN webhook        |
-| POST   | `/payments/refund/`             | Admin    | Initiate refund               |
-| GET    | `/payments/`                    | Required | List payments                 |
-| GET    | `/payments/{id}/`               | Required | Payment detail                |
-| GET    | `/payments/{id}/logs/`          | Required | Payment logs                  |
-| GET    | `/payments/my_payments/`        | Required | Current user's payments       |
-
----
-
-### Reviews
-
-Base URL: `/reviews/`
-
-| Method    | Endpoint                    | Auth     | Description                    |
-| --------- | --------------------------- | -------- | ------------------------------ |
-| GET       | `/reviews/`                 | Public   | List all reviews               |
-| GET       | `/reviews/?product_id=<id>` | Public   | Reviews for a specific product |
-| GET       | `/reviews/{id}/`            | Public   | Single review                  |
-| POST      | `/reviews/`                 | Required | Create a review                |
-| PUT/PATCH | `/reviews/{id}/`            | Required | Update your review             |
-| DELETE    | `/reviews/{id}/`            | Required | Delete your review             |
-
-> Rating must be between **1** and **5**.
-
----
-
-## 🔐 Authentication
-
-Urban Thread uses **JWT (JSON Web Token)** authentication via `djangorestframework-simplejwt`.
-
-1. Register or login to receive `access` and `refresh` tokens.
-2. Include the access token in every protected request:
-   ```
-   Authorization: Bearer <access_token>
-   ```
-3. Use `/accounts/token/refresh/` with your refresh token to get a new access token.
-4. Use `/accounts/logout/` to blacklist the refresh token on logout.
-
----
-
-## 💳 Payment Integration
+## 💳 Payment Gateway Integration
 
 ### SSLCommerz
-1. Get sandbox credentials from [SSLCommerz Developer Portal](https://developer.sslcommerz.com/).
-2. Set `SSLCOMMERZ_STORE_ID`, `SSLCOMMERZ_STORE_PASSWORD`, and `SSLCOMMERZ_IS_SANDBOX=True` in `.env`.
-3. Call `POST /payments/initiate/` → redirect user to returned `gateway_url`.
-4. SSLCommerz calls the success/fail/cancel/IPN endpoints automatically.
-
-### Cash on Delivery
-Set `payment_method: "cash_on_delivery"` when creating the order. The order is placed immediately with `payment_status: unpaid`.
-
----
-
-## 🛡 Admin Panel
-
-Access the Django admin at: `http://127.0.0.1:8000/admin/`
-
-All models are registered with sensible list displays, search, and filters including:
-- Users, profiles, and addresses
-- Products, brands, categories, images, sizes, colors
-- Inventory stock levels per variant
-- Orders and order items with status management
-- Coupons with expiry tracking
-- Payments with status badges and payment logs
-- Celery periodic task management (via `django-celery-beat`)
+1. Create a merchant test account on [SSLCommerz Sandbox](https://developer.sslcommerz.com/).
+2. Set credentials in `.env`:
+   ```env
+   SSLCOMMERZ_STORE_ID=your_store_id
+   SSLCOMMERZ_STORE_PASSWORD=your_store_password
+   SSLCOMMERZ_IS_SANDBOX=True
+   FRONTEND_URL=http://localhost:5173
+   BACKEND_PUBLIC_URL=https://your-public-backend-url.ngrok-free.app
+   ```
+3. When the customer initiates checkout, `POST /payments/initiate/` generates a secure gateway URL.
+4. After payment completion, the gateway invokes the callback endpoints, updates payment & order status, and redirects the customer back to the frontend result page.
 
 ---
 
-## 📖 API Documentation
+## 📧 Transactional Emails (Brevo / SendGrid)
 
-Two interactive API documentation UIs are available after starting the server:
-
-| UI                               | URL                                 |
-| -------------------------------- | ----------------------------------- |
-| **Swagger UI** (drf-spectacular) | `http://127.0.0.1:8000/api/docs/`   |
-| **Swagger UI** (drf-yasg)        | `http://127.0.0.1:8000/swagger/`    |
-| **ReDoc**                        | `http://127.0.0.1:8000/redoc/`      |
-| **OpenAPI JSON/YAML**            | `http://127.0.0.1:8000/api/schema/` |
+- **Brevo API (Recommended):** Set `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, and `BREVO_SENDER_NAME`. Outgoing emails use Brevo's HTTPS REST API to bypass blocked SMTP ports on cloud hosts. See [BREVO_SETUP_BN.md](BREVO_SETUP_BN.md).
+- **SendGrid API:** Set `SENDGRID_API_KEY`. See [SENDGRID_SETUP_BN.md](SENDGRID_SETUP_BN.md).
+- **Console Backend:** When neither key is supplied, emails print directly to the server terminal (`console.EmailBackend`), ideal for local development.
 
 ---
 
-## 🔄 CI/CD Pipeline
+## 🛡 Django Admin & Staff Features
 
-The project uses **GitHub Actions** for automated testing and deployment on every push to `main`.
+Access the Django Admin panel at `http://127.0.0.1:8000/admin/`:
+- **Inventory Matrix:** In-line editing of variant stock quantities.
+- **Order Management:** Status transitions, delivery zone adjustments, and customer tracking IDs.
+- **Coupons:** Expiration scheduling and usage limits.
+- **Celery Periodic Tasks:** Custom scheduling through `django-celery-beat` stored in the database.
 
-Pipeline steps:
-1. **Lint** — Code style checks
-2. **Test** — Run test suite with pytest
-3. **Build** — Build Docker image
-4. **Deploy** — Push to registry / deploy to server
+---
 
-Pipeline configuration: `.github/workflows/`
+## 🔄 Testing & CI/CD
+
+Run system checks and tests:
+```powershell
+python manage.py check
+python manage.py test
+```
+
+GitHub Actions automatically runs on push to `main`:
+1. **Flake8 Linting:** Code formatting and style adherence.
+2. **Django System Checks:** Configuration validation and model checks.
+3. **Migration Integrity:** Validates all models match database migration states.
+4. **Docker Image Build:** Builds and publishes the runtime container to GitHub Container Registry (GHCR).
 
 ---
 
 ## 📝 License
 
 This project is licensed under the **MIT License**.
-
----
-
-## Current checkout notes (verified)
-
-The sections above preserve the original project README. The details below update setup and endpoint information to match the current source in this checkout; use these notes if an earlier example conflicts.
-
-### Runtime and local configuration
-
-- The current dependency file pins **Django 6.0.1** and the Dockerfile uses **Python 3.12**.
-- This checkout has no backend `.env.example`. Settings read variables from the environment or an optional local `.env` file. SQLite (`DB_ENGINE=django.db.backends.sqlite3`) and in-memory cache (`REDIS_URL=locmem`) are the local defaults; PostgreSQL uses `DB_ENGINE`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, and `DB_PORT`.
-- The current cache/Celery setting is `REDIS_URL` (default `locmem`), with optional `CELERY_BROKER_URL` and `CELERY_RESULT_BACKEND` overrides. Compose supplies PostgreSQL and Redis and runs web, worker, beat, and Flower services. It does not use the separate `REDIS_BROKER_URL` and `REDIS_CACHE_URL` variables shown in the older sample above.
-- Other active settings include `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`, `SSLCOMMERZ_STORE_ID`, `SSLCOMMERZ_STORE_PASSWORD`, `SSLCOMMERZ_IS_SANDBOX`, `FRONTEND_URL`, `BACKEND_PUBLIC_URL`, and Django email settings. Local CORS permits the Vite development origin at `http://localhost:5173`.
-- Run local management commands from this backend directory after activating the workspace virtual environment (`..\venv\Scripts\Activate.ps1`): `python manage.py migrate`, `python manage.py createsuperuser`, and `python manage.py runserver 127.0.0.1:8000`.
-
-### Current endpoint and documentation paths
-
-- Inventory routes are under **`/inventory/inventorys/`**, not `/inventorys/inventorys/`. Public availability actions are `/inventory/inventorys/check_availability/` and `/inventory/inventorys/product_inventory/`; inventory management requires staff.
-- ReDoc is served at **`/api/schema/redoc/`**. Swagger is at `/api/docs/`, and the OpenAPI document is at `/api/schema/`.
-- Filter reviews with **`/reviews/?product_id=<id>`**. Product listing supports `category`, `brand`, and `is_available` filters, `search`, `ordering`, and limit/offset pagination; for example `/products/products/?search=shirt&category=1&ordering=-created_at&limit=20&offset=0`.
-- Storefront API routes also include `/products/banners/`, `/products/store-settings/`, and `/products/wishlist/`.
-
-### Current verification and CI status
-
-- The app `tests.py` files are Django test placeholders, so `python manage.py test` currently provides no meaningful feature coverage.
-- GitHub Actions runs flake8 checks, `manage.py check`, migrations, and Django tests; on pushes to `main` or `master` it builds and publishes the backend image to GHCR. The production SSH deployment job in the workflow is commented out, so this checkout does not automatically deploy the application.
-- `populate_test_data.py` creates predictable demo users, including an admin account with a hard-coded password. Use that script only with a disposable local database; do not run it against shared or production data.
-- SSLCommerz server callbacks/IPN require `BACKEND_PUBLIC_URL` to be reachable over the public internet. `FRONTEND_URL` is the browser return destination; neither should be set to a localhost URL for a live payment-provider flow.
