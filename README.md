@@ -254,14 +254,11 @@ SSLCOMMERZ_IS_SANDBOX=True
 FRONTEND_URL=http://localhost:3000
 GOOGLE_CLIENT_ID=your-google-oauth-web-client-id.apps.googleusercontent.com
 
-# Email
-EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_USE_TLS=True
-EMAIL_HOST_USER=your@email.com
-EMAIL_HOST_PASSWORD=your-app-password
-DEFAULT_FROM_EMAIL=noreply@urbanthread.com
+# Email (SendGrid HTTPS API)
+SENDGRID_API_KEY=SG.your-sendgrid-api-key
+EMAIL_BACKEND=accounts.email_backend.SendGridEmailBackend
+DEFAULT_FROM_EMAIL=verified-sender@your-domain.com
+SENDGRID_API_TIMEOUT=15
 
 # Optional phone OTP provider (Bearer token + JSON API)
 SMS_API_URL=https://your-sms-provider.example/send
@@ -361,7 +358,7 @@ POST /accounts/register/
 
 New password-based registrations remain inactive until the email OTP is verified. Set the same Google OAuth **Web client ID** in backend `GOOGLE_CLIENT_ID` and frontend `VITE_GOOGLE_CLIENT_ID`; add the frontend origins (for example `http://localhost:5173`) to the OAuth client's allowed JavaScript origins. The backend verifies Google ID tokens with Google's `google-auth` library.
 
-Phone OTP expects the configured SMS API to accept a Bearer token and a JSON body with `to`, `message`, and `sender`. Configure SMTP variables for email OTP delivery. OTPs expire after 10 minutes and allow at most five verification attempts.
+Phone OTP expects the configured SMS API to accept a Bearer token and a JSON body with `to`, `message`, and `sender`. Email OTPs use the configured email backend; for SendGrid's HTTPS API, see [the Bangla setup guide](SENDGRID_SETUP_BN.md). OTPs expire after 15 minutes and allow at most five verification attempts.
 
 ---
 

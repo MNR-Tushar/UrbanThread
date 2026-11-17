@@ -418,12 +418,33 @@ FRONTEND_URL = _raw_frontend_url.split(',')[0].strip().rstrip('/')
 BACKEND_PUBLIC_URL = config('BACKEND_PUBLIC_URL', default='')
 
 # Email Configuration
-EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
-EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+SENDGRID_API_KEY = config('SENDGRID_API_KEY', default='').strip()
+EMAIL_BACKEND = config(
+    'EMAIL_BACKEND',
+    default=(
+        'accounts.email_backend.SendGridEmailBackend'
+        if SENDGRID_API_KEY
+        else 'django.core.mail.backends.console.EmailBackend'
+    ),
+)
+# SendGrid's HTTPS API avoids outbound SMTP ports that are often blocked.
+SENDGRID_API_URL = config(
+    'SENDGRID_API_URL',
+    default='https://api.sendgrid.com/v3/mail/send',
+)
+SENDGRID_API_TIMEOUT = config('SENDGRID_API_TIMEOUT', default=15, cast=int)
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.sendgrid.net')
 EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
-EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+# Retain the SMTP settings for deployments that explicitly choose Django's SMTP backend.
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='apikey' if SENDGRID_API_KEY else '')
+# Ignore a stale Gmail password in .env when SendGrid is selected.
+EMAIL_HOST_PASSWORD = (
+    SENDGRID_API_KEY
+    if SENDGRID_API_KEY and EMAIL_HOST == 'smtp.sendgrid.net'
+    else config('EMAIL_HOST_PASSWORD', default='')
+)
+EMAIL_TIMEOUT = config('EMAIL_TIMEOUT', default=10, cast=int)
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@urbanthread.com')
 SMS_API_URL = config('SMS_API_URL', default='')
 SMS_API_TOKEN = config('SMS_API_TOKEN', default='')
