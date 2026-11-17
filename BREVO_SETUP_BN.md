@@ -29,7 +29,17 @@ BREVO_API_TIMEOUT=15
 
 `BREVO_API_KEY`-এ Brevo-র **API key** বসাবেন, SMTP key নয়। পুরো key কখনো GitHub, screenshot, chat বা log-এ শেয়ার করবেন না; `.env` Git-এ commit করবেন না। `BREVO_API_KEY` non-empty হলে settings স্বয়ংক্রিয়ভাবে Brevo backend বেছে নেবে, আগের SendGrid backend থাকলেও।
 
-## ৩. Restart ও email যাচাই
+## ৩. Email quota রক্ষার rate limit
+
+Project-এ email quota অপচয় কমানোর জন্য এই limits চালু আছে:
+
+- Register: প্রতি IP-তে সর্বোচ্চ ৫ বার/ঘণ্টা; verification resend: প্রতি IP-তে ৩ বার/ঘণ্টা।
+- একই email address-এ OTP: অন্তত ৬০ সেকেন্ড বিরতি এবং সর্বোচ্চ ৩টি/ঘণ্টা। এটি verification ও email password-reset OTP—দুটিতেই প্রযোজ্য।
+- Brevo/SendGrid API backend দিয়ে সব outbound email মিলিয়ে সর্বোচ্চ ২৫০ recipient/day। Brevo free plan-এর ৩০০/day limit থেকে ৫০টি reserve থাকে। অন্য quota চাইলে `.env`-এর `EMAIL_DAILY_SEND_CAP` বদলান।
+
+Rate-limit counter Django cache-এ থাকে। Docker Compose-এ app একই Redis cache ব্যবহার করে; production-এ shared Redis চালু রাখুন। Local `locmem` cache process restart হলে reset হয়, তাই এটিকে production abuse protection হিসেবে ব্যবহার করবেন না।
+
+## ৪. Restart ও email যাচাই
 
 1. Django backend বন্ধ করে আবার চালু করুন, যাতে নতুন `.env` পড়ে।
 2. Register করুন বা verification page থেকে নতুন code resend করুন।

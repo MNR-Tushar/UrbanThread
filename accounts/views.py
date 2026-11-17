@@ -25,6 +25,7 @@ from drf_spectacular.utils import extend_schema, extend_schema_view
 from .serializers import *
 from .models import Profile, Address, PasswordResetOTP, EmailVerificationOTP
 from .tasks import send_welcome_email
+from .email_limits import EmailRateLimitExceeded, reserve_otp_email_slot
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,8 @@ def _deliver_reset_otp(user, channel, code):
     expiry_minutes = 10
     message = f'Your UrbanThread password reset code is {code}. It expires in {expiry_minutes} minutes.'
     if channel == 'email':
+        if not reserve_otp_email_slot(user.email):
+            raise EmailRateLimitExceeded('OTP email rate limit reached for this address.')
         EmailMultiAlternatives(
             'Your UrbanThread password reset code',
             f'Hi {user.first_name or user.username},\n\n{message}\n\nIf you did not request this, ignore this email.',
@@ -70,20 +73,29 @@ def _deliver_reset_otp(user, channel, code):
 
 
 def _issue_email_verification_code(user):
+    if not reserve_otp_email_slot(user.email):
+        raise EmailRateLimitExceeded('OTP email rate limit reached for this address.')
     now = timezone.now()
-    EmailVerificationOTP.objects.filter(user=user, consumed_at__isnull=True).update(consumed_at=now)
     code = f'{secrets.randbelow(1_000_000):06d}'
-    EmailVerificationOTP.objects.create(
+    otp = EmailVerificationOTP.objects.create(
         user=user,
         code_hash=make_password(code),
         expires_at=now + timedelta(minutes=15),
     )
-    EmailMultiAlternatives(
-        'Verify your UrbanThread email',
-        f'Your email verification code is {code}. It expires in 15 minutes.',
-        settings.DEFAULT_FROM_EMAIL,
-        [user.email],
-    ).send(fail_silently=False)
+    try:
+        EmailMultiAlternatives(
+            'Verify your UrbanThread email',
+            f'Your email verification code is {code}. It expires in 15 minutes.',
+            settings.DEFAULT_FROM_EMAIL,
+            [user.email],
+        ).send(fail_silently=False)
+    except Exception:
+        otp.consumed_at = timezone.now()
+        otp.save(update_fields=['consumed_at'])
+        raise
+    EmailVerificationOTP.objects.filter(
+        user=user, consumed_at__isnull=True,
+    ).exclude(pk=otp.pk).update(consumed_at=timezone.now())
 
 
 def _auth_payload(user):
@@ -130,6 +142,9 @@ class EmailVerificationResendView(GenericAPIView):
         if user and not (user.is_active and user.email_verified):
             try:
                 _issue_email_verification_code(user)
+            except EmailRateLimitExceeded:
+                # Keep the same response for unknown, verified, and throttled addresses.
+                return Response({'detail': 'If verification is needed for this email, a code has been sent.'})
             except Exception:
                 logger.exception('Could not send email verification code')
                 return Response({'error': 'Could not send the verification code. Please try again later.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
@@ -243,7 +258,6 @@ class PasswordResetRequestView(GenericAPIView):
         user = _find_reset_user(contact, channel)
         if user:
             now = timezone.now()
-            PasswordResetOTP.objects.filter(user=user, channel=channel, consumed_at__isnull=True).update(consumed_at=now)
             code = f'{secrets.randbelow(1_000_000):06d}'
             otp = PasswordResetOTP.objects.create(
                 user=user,
@@ -258,6 +272,9 @@ class PasswordResetRequestView(GenericAPIView):
                 otp.save(update_fields=['consumed_at'])
                 logger.exception('Could not deliver password reset OTP via %s', channel)
                 return Response({'error': 'Could not send a reset code. Check the email or SMS gateway configuration and try again.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            PasswordResetOTP.objects.filter(
+                user=user, channel=channel, consumed_at__isnull=True,
+            ).exclude(pk=otp.pk).update(consumed_at=timezone.now())
         return Response({'detail': 'If an active account matches those details, a reset code has been sent.'})
 
 
@@ -337,6 +354,12 @@ class UserRegisterationAPIView(GenericAPIView):
         user = serializer.save()
         try:
             _issue_email_verification_code(user)
+        except EmailRateLimitExceeded:
+            logger.warning('Registration verification email was rate-limited')
+            return Response(
+                {'error': 'Too many verification emails were requested. Please wait before trying again.'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
         except Exception:
             logger.exception('Could not send registration verification code')
             return Response({'error': 'Account created, but the verification email could not be sent. Request a new code.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)

@@ -8,6 +8,8 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.mail.backends.base import BaseEmailBackend
 
+from .email_limits import reserve_daily_email_slot
+
 
 class SendGridEmailBackend(BaseEmailBackend):
     """Send Django email messages through the SendGrid v3 Mail Send API."""
@@ -38,6 +40,7 @@ class SendGridEmailBackend(BaseEmailBackend):
         sent = 0
         for message in email_messages:
             try:
+                reserve_daily_email_slot(len(message.recipients()))
                 response = self.session.post(
                     self.api_url,
                     json=self._build_payload(message),

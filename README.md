@@ -259,6 +259,9 @@ BREVO_API_KEY=xkeysib-your-brevo-api-key
 BREVO_SENDER_EMAIL=verified-sender@your-domain.com
 BREVO_SENDER_NAME=UrbanThread
 BREVO_API_TIMEOUT=15
+EMAIL_DAILY_SEND_CAP=250
+EMAIL_OTP_COOLDOWN_SECONDS=60
+EMAIL_OTP_PER_ADDRESS_PER_HOUR=3
 
 # Optional phone OTP provider (Bearer token + JSON API)
 SMS_API_URL=https://your-sms-provider.example/send

@@ -301,12 +301,15 @@ REST_FRAMEWORK = {
         'password_reset_request': '3/hour',
         'password_reset_confirm': '10/hour',
         'password_change': '5/hour',
-        'email_verification_request': '5/hour',
+        'email_verification_request': '3/hour',
         'email_verification_confirm': '10/hour',
         'google_sign_in': '20/minute',
         'chatbot': '20/minute',
     },
 }
+EMAIL_DAILY_SEND_CAP = config('EMAIL_DAILY_SEND_CAP', default=250, cast=int)
+EMAIL_OTP_COOLDOWN_SECONDS = config('EMAIL_OTP_COOLDOWN_SECONDS', default=60, cast=int)
+EMAIL_OTP_PER_ADDRESS_PER_HOUR = config('EMAIL_OTP_PER_ADDRESS_PER_HOUR', default=3, cast=int)
 
 # drf-spectacular (OpenAPI/Swagger) configuration
 SPECTACULAR_SETTINGS = {
