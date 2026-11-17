@@ -7,9 +7,9 @@ from accounts.models import CustomUser
 logger = logging.getLogger(__name__)
 
 
-def _queue_order_status_email(order_id):
-    from orders.tasks import dispatch_order_email, send_order_status_email
-    dispatch_order_email(send_order_status_email, order_id)
+def _queue_paid_order_invoice(order_id):
+    from orders.tasks import dispatch_order_email, send_order_invoice_email
+    dispatch_order_email(send_order_invoice_email, order_id)
 
 
 class Payment(models.Model):
@@ -94,7 +94,7 @@ class Payment(models.Model):
             OrderStatusHistory.objects.create(order=self.order, status='processing', note='Payment confirmed; order is being processed.')
         if previous_payment_status != 'paid' or previous_order_status != 'processing':
             order_id = self.order_id
-            transaction.on_commit(lambda: _queue_order_status_email(order_id))
+            transaction.on_commit(lambda: _queue_paid_order_invoice(order_id))
     
     def mark_as_failed(self, error_message=None):
         """Mark payment as failed"""

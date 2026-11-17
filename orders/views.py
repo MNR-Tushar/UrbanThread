@@ -282,7 +282,10 @@ class OrderViewSet(viewsets.GenericViewSet):
 
                 cart_items.delete()
                 transaction.on_commit(lambda: cache.delete(f"cart:{user.id if user else guest_token}"))
-                transaction.on_commit(lambda: dispatch_order_email(send_order_invoice_email, order.id))
+                # Online orders are not paid yet. Send their invoice after the
+                # payment callback confirms success; COD orders get it now.
+                if payment_method == 'cash_on_delivery':
+                    transaction.on_commit(lambda: dispatch_order_email(send_order_invoice_email, order.id))
                 transaction.on_commit(lambda: _enqueue_task(sync_order_stock, order.id))
                 transaction.on_commit(lambda: _enqueue_task(push_order_analytics_event, order.id, "order_placed"))
 

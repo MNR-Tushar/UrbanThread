@@ -44,6 +44,7 @@ def send_order_invoice_email(order_id: int) -> str:
         f"- {item.product.product_name} x{item.quantity} @ {item.price}"
         for item in order.items.all()
     ]
+    order_tracking_url = f"{settings.FRONTEND_URL.rstrip('/')}/orders/{order.pk}/track"
     body = (
         f"Hi {customer_name},\n\n"
         f"Thanks for your order {order.order_number}.\n"
@@ -52,6 +53,8 @@ def send_order_invoice_email(order_id: int) -> str:
         f"Total: {order.total_amount} BDT\n\n"
         "Items:\n"
         f"{chr(10).join(item_lines)}\n\n"
+        f"Track your order: {order_tracking_url}\n"
+        f"Courier tracking: {order.courier_tracking_url or 'Not available yet'}\n\n"
         "Urban Thread"
     )
 
@@ -82,7 +85,8 @@ def send_order_status_email(order_id: int) -> str:
     except ObjectDoesNotExist:
         payment_attempt_status = None
 
-    tracking_url = order.courier_tracking_url or 'Not available'
+    tracking_url = order.courier_tracking_url or 'Not available yet'
+    order_tracking_url = f"{settings.FRONTEND_URL.rstrip('/')}/orders/{order.pk}/track"
     payment_lines = [f"Payment status: {order.payment_status}"]
     if payment_attempt_status:
         payment_lines.append(f"Payment transaction status: {payment_attempt_status}")
@@ -96,7 +100,8 @@ def send_order_status_email(order_id: int) -> str:
             f"Total: {order.total_amount} BDT\n"
             f"Courier: {order.courier_name or 'Pending'}\n"
             f"Tracking ID: {order.courier_tracking_id or 'Pending'}\n"
-            f"Tracking link: {tracking_url}\n\n"
+            f"Courier tracking link: {tracking_url}\n"
+            f"Track your order: {order_tracking_url}\n\n"
             "Urban Thread"
         ),
         from_email=settings.DEFAULT_FROM_EMAIL,
