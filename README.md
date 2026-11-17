@@ -104,8 +104,6 @@ urbanthread/
 ├── .env                    # Environment configuration (ignored in git)
 ├── .env.example            # Sample environment variables
 ├── .gitignore
-├── BREVO_SETUP_BN.md       # Bengali guide for Brevo email setup
-├── SENDGRID_SETUP_BN.md    # Bengali guide for SendGrid email setup
 ├── docker-compose.yml      # Multi-container orchestration (web, db, redis, celery, beat, flower)
 ├── Dockerfile              # Multi-stage production container build
 ├── manage.py
@@ -505,8 +503,8 @@ The chatbot endpoint (`/chatbot/`) provides an intelligent shopping assistant fo
 
 ## 📧 Transactional Emails (Brevo / SendGrid)
 
-- **Brevo API (Recommended):** Set `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, and `BREVO_SENDER_NAME`. Outgoing emails use Brevo's HTTPS REST API to bypass blocked SMTP ports on cloud hosts. See [BREVO_SETUP_BN.md](BREVO_SETUP_BN.md).
-- **SendGrid API:** Set `SENDGRID_API_KEY`. See [SENDGRID_SETUP_BN.md](SENDGRID_SETUP_BN.md).
+- **Brevo API (Recommended):** Set `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, and `BREVO_SENDER_NAME`. Outgoing emails use Brevo's HTTPS REST API to bypass blocked outbound SMTP ports on cloud hosts.
+- **SendGrid API:** Set `SENDGRID_API_KEY` to send transactional emails via SendGrid's HTTPS API.
 - **Console Backend:** When neither key is supplied, emails print directly to the server terminal (`console.EmailBackend`), ideal for local development.
 
 ---

@@ -2,3 +2,5 @@ db.sqlite3
 .env
 populate_test_data.py
 local-data.json
+BREVO_SETUP_BN.md
+SENDGRID_SETUP_BN.md
