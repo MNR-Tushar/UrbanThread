@@ -16,6 +16,21 @@ from orders.models import Order
 logger = logging.getLogger(__name__)
 
 
+def dispatch_order_email(task, order_id: int) -> None:
+    """Send order email inline when deployment has no Celery worker."""
+    if getattr(settings, "ORDER_EMAILS_SYNC", False):
+        try:
+            task.apply(args=(order_id,), throw=True)
+        except Exception:
+            logger.exception("Could not send order email for order %s", order_id)
+        return
+
+    try:
+        task.delay(order_id)
+    except Exception:
+        logger.exception("Could not queue order email for order %s", order_id)
+
+
 @shared_task(name="orders.tasks.send_order_invoice_email", max_retries=3, default_retry_delay=60)
 def send_order_invoice_email(order_id: int) -> str:
     try:

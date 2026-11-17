@@ -8,11 +8,8 @@ logger = logging.getLogger(__name__)
 
 
 def _queue_order_status_email(order_id):
-    try:
-        from orders.tasks import send_order_status_email
-        send_order_status_email.delay(order_id)
-    except Exception:
-        logger.exception('Could not queue payment-related order email for order %s', order_id)
+    from orders.tasks import dispatch_order_email, send_order_status_email
+    dispatch_order_email(send_order_status_email, order_id)
 
 
 class Payment(models.Model):

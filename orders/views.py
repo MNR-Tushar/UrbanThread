@@ -22,6 +22,7 @@ from payments.models import Payment
 from coupons.models import Coupon
 from products.models import StoreSettings, DeliveryZone
 from .tasks import (
+    dispatch_order_email,
     generate_sales_report,
     push_order_analytics_event,
     send_order_invoice_email,
@@ -107,7 +108,7 @@ class OrderViewSet(viewsets.GenericViewSet):
         if previous_status != next_status:
             OrderStatusHistory.objects.create(order=order, status=next_status, note=f'Status changed from {previous_status} to {next_status}.')
             from .tasks import send_order_status_email
-            transaction.on_commit(lambda: _enqueue_task(send_order_status_email, order.id))
+            transaction.on_commit(lambda: dispatch_order_email(send_order_status_email, order.id))
         return Response(OrderSerializer(order).data)
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
@@ -125,7 +126,7 @@ class OrderViewSet(viewsets.GenericViewSet):
         if changed_fields:
             order.save(update_fields=[*changed_fields, 'updated_at'])
             from .tasks import send_order_status_email
-            transaction.on_commit(lambda: _enqueue_task(send_order_status_email, order.id))
+            transaction.on_commit(lambda: dispatch_order_email(send_order_status_email, order.id))
         return Response(OrderSerializer(order).data)
 
     @action(detail=True, methods=['get'])
@@ -281,7 +282,7 @@ class OrderViewSet(viewsets.GenericViewSet):
 
                 cart_items.delete()
                 transaction.on_commit(lambda: cache.delete(f"cart:{user.id if user else guest_token}"))
-                transaction.on_commit(lambda: _enqueue_task(send_order_invoice_email, order.id))
+                transaction.on_commit(lambda: dispatch_order_email(send_order_invoice_email, order.id))
                 transaction.on_commit(lambda: _enqueue_task(sync_order_stock, order.id))
                 transaction.on_commit(lambda: _enqueue_task(push_order_analytics_event, order.id, "order_placed"))
 

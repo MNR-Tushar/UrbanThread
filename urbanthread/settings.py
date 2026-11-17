@@ -428,6 +428,7 @@ BACKEND_PUBLIC_URL = config('BACKEND_PUBLIC_URL', default='')
 # Email Configuration
 SENDGRID_API_KEY = config('SENDGRID_API_KEY', default='').strip()
 BREVO_API_KEY = config('BREVO_API_KEY', default='').strip()
+ORDER_EMAILS_SYNC = config('ORDER_EMAILS_SYNC', default=False, cast=bool)
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@urbanthread.com').strip()
 BREVO_SENDER_EMAIL = config('BREVO_SENDER_EMAIL', default=DEFAULT_FROM_EMAIL).strip()
 BREVO_SENDER_NAME = config('BREVO_SENDER_NAME', default='UrbanThread').strip()
