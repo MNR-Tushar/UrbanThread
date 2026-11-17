@@ -156,9 +156,14 @@ if not REDIS_ENABLED:
     CELERY_BROKER_URL = config("CELERY_BROKER_URL", default="memory://")
     CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", default=None) or None
     CELERY_TASK_IGNORE_RESULT = True
+    # A memory broker has no separate worker, so execute background tasks inline locally.
+    CELERY_TASK_ALWAYS_EAGER = config("CELERY_TASK_ALWAYS_EAGER", default=True, cast=bool)
+    CELERY_TASK_EAGER_PROPAGATES = config("CELERY_TASK_EAGER_PROPAGATES", default=True, cast=bool)
 else:
     CELERY_BROKER_URL = config("CELERY_BROKER_URL", default=REDIS_URL)
     CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", default=REDIS_URL)
+    CELERY_TASK_ALWAYS_EAGER = config("CELERY_TASK_ALWAYS_EAGER", default=False, cast=bool)
+    CELERY_TASK_EAGER_PROPAGATES = config("CELERY_TASK_EAGER_PROPAGATES", default=False, cast=bool)
  
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
