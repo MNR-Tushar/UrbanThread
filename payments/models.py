@@ -1,6 +1,18 @@
-from django.db import models
+import logging
+
+from django.db import models, transaction
 from orders.models import Order
 from accounts.models import CustomUser
+
+logger = logging.getLogger(__name__)
+
+
+def _queue_order_status_email(order_id):
+    try:
+        from orders.tasks import send_order_status_email
+        send_order_status_email.delay(order_id)
+    except Exception:
+        logger.exception('Could not queue payment-related order email for order %s', order_id)
 
 
 class Payment(models.Model):
@@ -75,13 +87,17 @@ class Payment(models.Model):
         self.save()
         
         # FIX: order.payment_status is now a CharField ('paid'), not a boolean
+        previous_payment_status = self.order.payment_status
+        previous_order_status = self.order.order_status
         self.order.payment_status = 'paid'
-        previous_status = self.order.order_status
         self.order.order_status = 'processing'
         self.order.save()
-        if previous_status != 'processing':
+        if previous_order_status != 'processing':
             from orders.models import OrderStatusHistory
             OrderStatusHistory.objects.create(order=self.order, status='processing', note='Payment confirmed; order is being processed.')
+        if previous_payment_status != 'paid' or previous_order_status != 'processing':
+            order_id = self.order_id
+            transaction.on_commit(lambda: _queue_order_status_email(order_id))
     
     def mark_as_failed(self, error_message=None):
         """Mark payment as failed"""

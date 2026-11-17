@@ -6,6 +6,7 @@ from pathlib import Path
 
 from celery import shared_task
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.mail import EmailMultiAlternatives, mail_admins
 from django.db.models import Count, Sum
 from django.utils import timezone
@@ -58,9 +59,31 @@ def send_order_status_email(order_id: int) -> str:
         order = Order.objects.select_related('user').get(pk=order_id)
     except Order.DoesNotExist:
         return f"skipped: order {order_id} not found"
+    customer_name = order.customer_name or (
+        order.user.first_name or order.user.username if order.user else "Customer"
+    )
+    try:
+        payment_attempt_status = order.payment.status
+    except ObjectDoesNotExist:
+        payment_attempt_status = None
+
+    tracking_url = order.courier_tracking_url or 'Not available'
+    payment_lines = [f"Payment status: {order.payment_status}"]
+    if payment_attempt_status:
+        payment_lines.append(f"Payment transaction status: {payment_attempt_status}")
     msg = EmailMultiAlternatives(
         subject=f"Order update - {order.order_number}",
-        body=f"Your order {order.order_number} is now {order.order_status}. Courier: {order.courier_name or 'Pending'}. Tracking ID: {order.courier_tracking_id or 'Pending'}.",
+        body=(
+            f"Hi {customer_name},\n\n"
+            f"Your order {order.order_number} has been updated.\n"
+            f"Order status: {order.order_status}\n"
+            f"{chr(10).join(payment_lines)}\n"
+            f"Total: {order.total_amount} BDT\n"
+            f"Courier: {order.courier_name or 'Pending'}\n"
+            f"Tracking ID: {order.courier_tracking_id or 'Pending'}\n"
+            f"Tracking link: {tracking_url}\n\n"
+            "Urban Thread"
+        ),
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=[order.customer_email or (order.user.email if order.user else '')],
     )

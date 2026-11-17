@@ -25,7 +25,7 @@ from .serializers import (
 from .utils import SSLCommerzPayment, validation_matches_payment
 from .tasks import retry_payment_verification
 from orders.models import Order
-from orders.tasks import push_order_analytics_event
+from orders.tasks import push_order_analytics_event, send_order_status_email
 from accounts.models import Address
 
 logger = logging.getLogger(__name__)
@@ -362,10 +362,13 @@ class SSLCommerzFailView(APIView):
         
         try:
             payment = Payment.objects.get(transaction_id=tran_id)
+            previous_status = payment.status
             payment.status = 'failed'
             payment.error_message = request.data.get('error', 'Payment failed')
             payment.response_data = request.data
             payment.save()
+            if previous_status != 'failed':
+                _enqueue_payment_task(send_order_status_email, payment.order_id)
             
             # Log the failure
             fail_log_data = request.data.copy() if isinstance(request.data, dict) else {}
@@ -400,9 +403,12 @@ class SSLCommerzCancelView(APIView):
         
         try:
             payment = Payment.objects.get(transaction_id=tran_id)
+            previous_status = payment.status
             payment.status = 'cancelled'
             payment.response_data = request.data
             payment.save()
+            if previous_status != 'cancelled':
+                _enqueue_payment_task(send_order_status_email, payment.order_id)
             
             # Log the cancellation
             cancel_log_data = request.data.copy() if isinstance(request.data, dict) else {}
@@ -537,12 +543,16 @@ class RefundPaymentView(APIView):
         )
         
         if refund_response.get('status') == 'success':
+            previous_payment_status = payment.status
+            previous_order_status = payment.order.payment_status
             payment.status = 'refunded'
             payment.save()
             
             # Update order
             payment.order.payment_status = 'refunded'
             payment.order.save()
+            if previous_payment_status != 'refunded' or previous_order_status != 'refunded':
+                _enqueue_payment_task(send_order_status_email, payment.order_id)
             
             return Response({
                 'success': True,

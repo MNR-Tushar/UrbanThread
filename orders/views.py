@@ -117,10 +117,15 @@ class OrderViewSet(viewsets.GenericViewSet):
         order = Order.objects.filter(pk=pk).first()
         if not order:
             return Response({'detail': 'Order not found.'}, status=status.HTTP_404_NOT_FOUND)
+        changed_fields = []
         for field in ('courier_name', 'courier_tracking_id', 'courier_tracking_url'):
-            if field in request.data:
+            if field in request.data and getattr(order, field) != request.data[field]:
                 setattr(order, field, request.data[field])
-        order.save(update_fields=['courier_name', 'courier_tracking_id', 'courier_tracking_url', 'updated_at'])
+                changed_fields.append(field)
+        if changed_fields:
+            order.save(update_fields=[*changed_fields, 'updated_at'])
+            from .tasks import send_order_status_email
+            transaction.on_commit(lambda: _enqueue_task(send_order_status_email, order.id))
         return Response(OrderSerializer(order).data)
 
     @action(detail=True, methods=['get'])
